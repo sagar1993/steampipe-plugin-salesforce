@@ -55,6 +55,27 @@ func pluginTableDefinitions(ctx context.Context, td *plugin.TableMapData) (map[s
 	var mapLock sync.Mutex
 	config := GetConfig(td.Connection)
 
+	userDefinedDynamicColumns := make(map[string]map[string]bool)
+	userDefinedDynamicColumnConfigs := []UserDefinedDynamicColumnConfig{}
+
+	if config.UserDefinedDynamicColumnConfig != nil {
+		// Unmarshal the JSON array string into the slice of UserDefinedTableConfig
+		err = json.Unmarshal([]byte(*config.UserDefinedDynamicColumnConfig), &userDefinedDynamicColumnConfigs)
+		if err == nil {
+			// create userDefinedTables
+			for _, userDefinedDynamicColumnConfig := range userDefinedDynamicColumnConfigs {
+				tableName := userDefinedDynamicColumnConfig.Name
+				userDefinedDynamicColumns[tableName] = make(map[string]bool)
+				for _, columnName := range userDefinedDynamicColumnConfig.Columns {
+					userDefinedDynamicColumns[tableName][columnName] = true
+				}
+			}
+			plugin.Logger(ctx).Debug("userDefinedDynamicColumns", userDefinedDynamicColumns)
+		} else {
+			plugin.Logger(ctx).Warn("Empty userDefinedDynamicColumns Invalid JSON", userDefinedDynamicColumns)
+		}
+	}
+
 	// If Salesforce client was obtained, don't generate dynamic columns for
 	// defined static tables
 	if client != nil {
@@ -63,7 +84,7 @@ func pluginTableDefinitions(ctx context.Context, td *plugin.TableMapData) (map[s
 		for _, st := range staticTables {
 			go func(staticTable string) {
 				defer wgd.Done()
-				dynamicCols, dynamicKeyColumns, salesforceCols := dynamicColumns(ctx, client, staticTable, config)
+				dynamicCols, dynamicKeyColumns, salesforceCols := dynamicColumns(ctx, client, staticTable, config, getUserDefinedDynamicColumns(userDefinedDynamicColumns, staticTable))
 				mapLock.Lock()
 				dynamicColumnsMap[staticTable] = dynamicMap{dynamicCols, dynamicKeyColumns, salesforceCols}
 				defer mapLock.Unlock()
@@ -159,7 +180,7 @@ func pluginTableDefinitions(ctx context.Context, td *plugin.TableMapData) (map[s
 			plugin.Logger(ctx).Debug("salesforce.pluginTableDefinitions", "object_name", name, "table_name", tableName)
 			ctx = context.WithValue(ctx, contextKey("PluginTableName"), tableName)
 			ctx = context.WithValue(ctx, contextKey("SalesforceTableName"), name)
-			table := generateDynamicTables(ctx, client, config)
+			table := generateDynamicTables(ctx, client, config, getUserDefinedDynamicColumns(userDefinedDynamicColumns, tableName))
 			// Ignore if the requested Salesforce object is not present.
 			if table != nil {
 				tables[tableName] = table
@@ -170,7 +191,7 @@ func pluginTableDefinitions(ctx context.Context, td *plugin.TableMapData) (map[s
 	return tables, nil
 }
 
-func generateDynamicTables(ctx context.Context, client *simpleforce.Client, config salesforceConfig) *plugin.Table {
+func generateDynamicTables(ctx context.Context, client *simpleforce.Client, config salesforceConfig, userDefinedDynamicColumns map[string]bool) *plugin.Table {
 	// Get the query for the metric (required)
 	salesforceTableName := ctx.Value(contextKey("SalesforceTableName")).(string)
 	tableName := ctx.Value(contextKey("PluginTableName")).(string)
@@ -227,6 +248,10 @@ func generateDynamicTables(ctx context.Context, client *simpleforce.Client, conf
 			columnFieldName = fieldName
 		} else if strings.HasSuffix(fieldName, "__c") {
 			columnFieldName = strings.ToLower(fieldName)
+			_, ok := userDefinedDynamicColumns[columnFieldName]
+			if len(userDefinedDynamicColumns) != 0 && !ok {
+				continue
+			}
 		} else {
 			columnFieldName = strcase.ToSnake(fieldName)
 		}
@@ -285,4 +310,16 @@ func checkNameScheme(config salesforceConfig, dynamicColumns []*plugin.Column) s
 		return "Id"
 	}
 	return "id"
+}
+
+func getUserDefinedDynamicColumns(userDefinedTables map[string]map[string]bool, tableName string) map[string]bool {
+	if strings.HasPrefix(tableName, "salesforce_") {
+		tableName = strings.TrimPrefix(tableName, "salesforce_")
+		tableName = strcase.ToCamel(tableName)
+	}
+	if _, ok := userDefinedTables[tableName]; ok {
+		return userDefinedTables[tableName]
+	} else {
+		return make(map[string]bool)
+	}
 }

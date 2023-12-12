@@ -246,7 +246,7 @@ func mergeTableColumns(_ context.Context, config salesforceConfig, dynamicColumn
 }
 
 // dynamicColumns:: Returns list coulms for a salesforce object
-func dynamicColumns(ctx context.Context, client *simpleforce.Client, salesforceTableName string, config salesforceConfig) ([]*plugin.Column, plugin.KeyColumnSlice, map[string]string) {
+func dynamicColumns(ctx context.Context, client *simpleforce.Client, salesforceTableName string, config salesforceConfig, userDefinedDynamicColumns map[string]bool) ([]*plugin.Column, plugin.KeyColumnSlice, map[string]string) {
 	sObjectMeta := client.SObject(salesforceTableName).Describe()
 	if sObjectMeta == nil {
 		plugin.Logger(ctx).Error("salesforce.dynamicColumns", fmt.Sprintf("Table %s not present in salesforce", salesforceTableName))
@@ -302,6 +302,10 @@ func dynamicColumns(ctx context.Context, client *simpleforce.Client, salesforceT
 			columnFieldName = strings.ToLower(fieldName)
 		} else {
 			columnFieldName = strcase.ToSnake(fieldName)
+		}
+
+		if len(userDefinedDynamicColumns) != 0 && userDefinedDynamicColumns[columnFieldName] != true {
+			continue
 		}
 
 		column := plugin.Column{

@@ -13,14 +13,21 @@ const (
 )
 
 type salesforceConfig struct {
-	URL              *string               `cty:"url"`
-	Username         *string               `cty:"username"`
-	Password         *string               `cty:"password"`
-	Token            *string               `cty:"token"`
-	ClientId         *string               `cty:"client_id"`
-	APIVersion       *string               `cty:"api_version"`
-	Objects          *[]string             `cty:"objects"`
-	NamingConvention *NamingConventionEnum `cty:"naming_convention"`
+	URL                            *string               `cty:"url"`
+	Username                       *string               `cty:"username"`
+	Password                       *string               `cty:"password"`
+	Token                          *string               `cty:"token"`
+	ClientId                       *string               `cty:"client_id"`
+	APIVersion                     *string               `cty:"api_version"`
+	Objects                        *[]string             `cty:"objects"`
+	NamingConvention               *NamingConventionEnum `cty:"naming_convention"`
+	UserDefinedDynamicColumnConfig *string               `cty:"user_defined_dynamic_column_config"`
+	ResultSize                     *int                  `cty:"result_size"`
+}
+
+type UserDefinedDynamicColumnConfig struct {
+	Name    string   `json:name`
+	Columns []string `json:columns`
 }
 
 var ConfigSchema = map[string]*schema.Attribute{
@@ -50,6 +57,12 @@ var ConfigSchema = map[string]*schema.Attribute{
 		Elem: &schema.Attribute{
 			Type: schema.TypeString,
 		},
+	},
+	"user_defined_dynamic_column_config": {
+		Type: schema.TypeString,
+	},
+	"result_size": {
+		Type: schema.TypeInt,
 	},
 }
 

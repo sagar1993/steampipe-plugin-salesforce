@@ -3,6 +3,8 @@ package salesforce
 import (
 	"context"
 	"fmt"
+	"math"
+	"strconv"
 	"strings"
 
 	"github.com/turbot/steampipe-plugin-sdk/v5/plugin"
@@ -29,6 +31,20 @@ func listSalesforceObjectsByTable(tableName string, salesforceCols map[string]st
 			query = fmt.Sprintf("%s where %s", query, condition)
 			plugin.Logger(ctx).Debug("salesforce.listSalesforceObjectsByTable", "table_name", d.Table.Name, "query_condition", condition)
 		}
+		salesforceConfig := GetConfig(d.Connection)
+
+		if isColumnAvailable("last_modified_date", d.Table.Columns) {
+			query = fmt.Sprintf("%s  order by lastModifiedDate desc", query)
+		}
+
+		if salesforceConfig.ResultSize != nil {
+			intValue := *salesforceConfig.ResultSize
+			if 0 < intValue && intValue < math.MaxInt32 {
+				limitString := strconv.Itoa(intValue)
+				query = fmt.Sprintf("%s  limit %s", query, limitString)
+			}
+		}
+		plugin.Logger(ctx).Debug("## getting results for query : ", query)
 
 		for {
 			result, err := client.Query(query)
