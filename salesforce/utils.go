@@ -349,3 +349,24 @@ func isColumnAvailable(columnName string, columns []*plugin.Column) bool {
 	}
 	return false
 }
+
+func getKeyColumns(columns []*plugin.Column) plugin.KeyColumnSlice {
+	keyColumns := plugin.KeyColumnSlice{}
+	for _, col := range columns {
+		switch col.Type {
+		case proto.ColumnType_STRING:
+			keyColumns = append(keyColumns, &plugin.KeyColumn{Name: col.Name, Require: plugin.Optional, Operators: []string{"=", "<>"}})
+		case proto.ColumnType_TIMESTAMP:
+			keyColumns = append(keyColumns, &plugin.KeyColumn{Name: col.Name, Require: plugin.Optional, Operators: []string{"=", ">", ">=", "<=", "<"}})
+		case proto.ColumnType_BOOL:
+			keyColumns = append(keyColumns, &plugin.KeyColumn{Name: col.Name, Require: plugin.Optional, Operators: []string{"=", "<>"}})
+		case proto.ColumnType_DOUBLE:
+			keyColumns = append(keyColumns, &plugin.KeyColumn{Name: col.Name, Require: plugin.Optional, Operators: []string{"=", ">", ">=", "<=", "<"}})
+		case proto.ColumnType_INT:
+			keyColumns = append(keyColumns, &plugin.KeyColumn{Name: col.Name, Require: plugin.Optional, Operators: []string{"=", ">", ">=", "<=", "<"}})
+		default:
+			keyColumns = append(keyColumns, &plugin.KeyColumn{Name: col.Name, Require: plugin.Optional, Operators: []string{"=", ">", ">=", "<=", "<", "<>"}})
+		}
+	}
+	return keyColumns
+}
