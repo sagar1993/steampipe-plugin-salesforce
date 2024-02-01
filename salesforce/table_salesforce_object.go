@@ -6,12 +6,57 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/iancoleman/strcase"
+	"github.com/turbot/steampipe-plugin-salesforce/cache"
 	"github.com/turbot/steampipe-plugin-sdk/v5/plugin"
 	"github.com/turbot/steampipe-plugin-sdk/v5/plugin/transform"
 )
 
 //// LIST HYDRATE FUNCTION
+
+var tableKeyStruct = []cache.KeyStruct{
+	{
+		Name:              "Account",
+		Pk:                "Id",
+		Fk:                []cache.ForeignKeyStruct{},
+		BulkDataPullByIds: bulkDataPullByIds,
+	}, {
+		Name: "Opportunity",
+		Pk:   "Id",
+		Fk: []cache.ForeignKeyStruct{{
+			Key:              "AccountId",
+			ForeignTableName: "Account",
+		}},
+		BulkDataPullByIds: bulkDataPullByIds,
+	}, {
+		Name: "Case",
+		Pk:   "Id",
+		Fk: []cache.ForeignKeyStruct{{
+			Key:              "AccountId",
+			ForeignTableName: "Account",
+		}},
+		BulkDataPullByIds: bulkDataPullByIds,
+	}, {
+		Name: "Order",
+		Pk:   "Id",
+		Fk: []cache.ForeignKeyStruct{{
+			Key:              "AccountId",
+			ForeignTableName: "Account",
+		}},
+		BulkDataPullByIds: bulkDataPullByIds,
+	},
+}
+
+var cacheExpiration = 1 * time.Minute
+var cleanupInterval = 2 * time.Minute
+var batchSize = 200
+var idFormatter = func(id string) string {
+	return fmt.Sprintf("'%s'", id)
+}
+
+var cacheUtil = cache.NewCacheUtil(tableKeyStruct, cacheExpiration, cleanupInterval, batchSize, idFormatter)
 
 func listSalesforceObjectsByTable(tableName string, salesforceCols map[string]string) func(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData) (interface{}, error) {
 	return func(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData) (interface{}, error) {
@@ -61,6 +106,7 @@ func listSalesforceObjectsByTable(tableName string, salesforceCols map[string]st
 			}
 
 			for _, account := range *AccountList {
+				cacheUtil.AddIdsToForeignTableCache(getTableName(tableName), account)
 				d.StreamListItem(ctx, account)
 			}
 
@@ -76,7 +122,44 @@ func listSalesforceObjectsByTable(tableName string, salesforceCols map[string]st
 	}
 }
 
-//// GET HYDRATE FUNCTION
+func bulkDataPullByIds(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData, ids []string) (*[]map[string]interface{}, error) {
+	// make query call to get data and update cache
+	// make query call to get data
+	query := generateQuery(d.Table.Columns, getTableName(d.Table.Name))
+
+	// Concatenate the values into a comma-separated string
+	inClause := strings.Join(ids, ",")
+
+	// Create the WHERE clause
+	whereClause := fmt.Sprintf("WHERE Id IN (%s)", inClause)
+	query = fmt.Sprintf("%s  %s", query, whereClause)
+
+	client, err := connect(ctx, d)
+	if err != nil {
+		plugin.Logger(ctx).Error("salesforce.bulkDataPullByIds", "connection error", err)
+		return nil, err
+	}
+	if client == nil {
+		plugin.Logger(ctx).Error("salesforce.bulkDataPullByIds", "client_not_found: unable to generate dynamic tables because of invalid steampipe salesforce configuration", err)
+		return nil, fmt.Errorf("salesforce.bulkDataPullByIds: client_not_found, unable to query table %s because of invalid steampipe salesforce configuration", d.Table.Name)
+	}
+
+	plugin.Logger(ctx).Debug("salesforce.bulkDataPullByIds GET getting results for query : ", query)
+
+	result, err := client.Query(query)
+	if err != nil {
+		plugin.Logger(ctx).Error("salesforce.bulkDataPullByIds", "query error", err)
+		return nil, err
+	}
+
+	data := new([]map[string]interface{})
+	err = decodeQueryResult(ctx, result.Records, data)
+	if err != nil {
+		plugin.Logger(ctx).Error("salesforce.bulkDataPullByIds", "results decoding error", err)
+		return nil, err
+	}
+	return data, nil
+}
 
 func getSalesforceObjectbyID(tableName string) func(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData) (interface{}, error) {
 	return func(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData) (interface{}, error) {
@@ -92,6 +175,14 @@ func getSalesforceObjectbyID(tableName string) func(ctx context.Context, d *plug
 			return nil, nil
 		}
 
+		record, err := cacheUtil.GetRecordByIdAndBuildCache(ctx, d, h, getTableName(tableName), id)
+		if record != nil {
+			return record, nil
+		}
+		if err != nil {
+			plugin.Logger(ctx).Error("salesforce.getSalesforceObjectbyID", "error getting record from cache", err)
+		}
+
 		client, err := connect(ctx, d)
 		if err != nil {
 			plugin.Logger(ctx).Error("salesforce.getSalesforceObjectbyID", "connection error", err)
@@ -105,7 +196,7 @@ func getSalesforceObjectbyID(tableName string) func(ctx context.Context, d *plug
 		obj := client.SObject(tableName).Get(id)
 		if obj == nil {
 			// Object doesn't exist, handle the error
-			plugin.Logger(ctx).Warn("salesforce.getSalesforceObjectbyID", fmt.Sprintf("%s with id \"%s\" not found", tableName, id))
+			plugin.Logger(ctx).Error("salesforce.getSalesforceObjectbyID", fmt.Sprintf("%s with id \"%s\" not found", tableName, id))
 			return nil, nil
 		}
 
@@ -132,4 +223,18 @@ func getFieldFromSObjectMapByColumnName(ctx context.Context, d *transform.Transf
 	salesforceColumnName := getSalesforceColumnName(d.ColumnName)
 	ls := d.HydrateItem.(map[string]interface{})
 	return ls[salesforceColumnName], nil
+}
+
+// convert tablename salesforce_abc to Abc
+func getTableName(input string) string {
+	// Check if the string starts with "salesforce_"
+	if strings.HasPrefix(input, "salesforce_") {
+		// Remove "salesforce_"
+		trimmed := strings.TrimPrefix(input, "salesforce_")
+		// Convert to camelCase
+		camelCase := strcase.ToCamel(trimmed)
+		return camelCase
+	}
+	// If the string doesn't start with "salesforce_", return it as is
+	return input
 }
