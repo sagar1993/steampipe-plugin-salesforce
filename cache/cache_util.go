@@ -2,7 +2,7 @@ package cache
 
 import (
 	"context"
-	"sync"
+	"fmt"
 	"time"
 
 	"github.com/patrickmn/go-cache"
@@ -31,7 +31,7 @@ func generateTableCache(tableKeyStruct []KeyStruct, cacheExpiration time.Duratio
 func generateIdSet(tableKeyStruct []KeyStruct) map[string]*Set {
 	tableIdSet := make(map[string]*Set)
 	for _, keyStruct := range tableKeyStruct {
-		tableIdSet[keyStruct.Name] = NewSet()
+		tableIdSet[keyStruct.Name] = &Set{}
 	}
 	return tableIdSet
 }
@@ -94,7 +94,10 @@ func (c *CacheUtil) getKeyStructForTableName(tableName string) *KeyStruct {
 // TODO create generator function for this
 // so that memory can be freed up
 // discards any entries in cache.
-func (c *CacheUtil) getKeysToPullInBatches(tableName string, batchSize int) [][]string {
+func (c *CacheUtil) getKeysToPullInBatches(ctx context.Context, tableName string, batchSize int) [][]string {
+	startTime := time.Now()
+	defer measureTime(ctx, startTime, "getKeysToPullInBatches")
+
 	var result [][]string
 	var currentTime = time.Now()
 	var currentBatch []string
@@ -104,7 +107,7 @@ func (c *CacheUtil) getKeysToPullInBatches(tableName string, batchSize int) [][]
 	var idSet *Set
 	idSet = c.getIdSetForTableName(tableName)
 
-	for key, time := range idSet.set {
+	for key, time := range *idSet {
 		if cache != nil {
 			if record, exists := cache.Get(key); exists {
 				// if required element is already in cache increment TTL for the element in cache
@@ -131,7 +134,7 @@ func (c *CacheUtil) getKeysToPullInBatches(tableName string, batchSize int) [][]
 
 // The function is used along with the List call in plugin and adds the ids to the id cache of the foreign table
 // and records to the table cache
-func (c *CacheUtil) AddIdsToForeignTableCache(tableName string, record map[string]interface{}) {
+func (c *CacheUtil) AddIdsToForeignTableCache(ctx context.Context, tableName string, record map[string]interface{}) {
 	keyStruct := c.getKeyStructForTableName(tableName)
 	// Add foreign keys to the id set
 	for _, fk := range keyStruct.Fk {
@@ -168,7 +171,7 @@ func (c *CacheUtil) GetRecordByIdAndBuildCache(ctx context.Context, d *plugin.Qu
 	}
 
 	//--------------- Build cache in batches ------------------//
-	var batches = c.getKeysToPullInBatches(tableName, c.batchSize)
+	var batches = c.getKeysToPullInBatches(ctx, tableName, c.batchSize)
 
 	for _, batch := range batches {
 
@@ -188,7 +191,7 @@ func (c *CacheUtil) GetRecordByIdAndBuildCache(ctx context.Context, d *plugin.Qu
 					// Removing the id from the set
 					idSet.Remove(idValue)
 
-					c.AddIdsToForeignTableCache(tableName, record)
+					c.AddIdsToForeignTableCache(ctx, tableName, record)
 
 				} else {
 					plugin.Logger(ctx).Debug("salesforce.GetRecordByIdAndBuildCache cache set failed ", id, " id value ", idValue)
@@ -214,36 +217,18 @@ func (c *CacheUtil) GetRecordByIdAndBuildCache(ctx context.Context, d *plugin.Qu
 
 // Replace with time based map with TTL
 
-type Set struct {
-	mu  sync.Mutex
-	set map[string]time.Time
+type Set map[string]time.Time
+
+func (s Set) Add(element string) {
+	s[element] = time.Now()
 }
 
-// Add adds an element to the set
-func (s *Set) Add(entry string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.set[entry] = time.Now()
+func (s Set) Remove(element string) {
+	delete(s, element)
 }
 
-// Remove removes an element from the set
-func (s *Set) Remove(entry string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	delete(s.set, entry)
-}
-
-// Contains checks if the set contains a specific element
-func (s *Set) Contains(entry string) time.Time {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.set[entry]
-}
-
-func NewSet() *Set {
-	return &Set{
-		set: make(map[string]time.Time),
-	}
+func (s Set) Contains(element string) time.Time {
+	return s[element]
 }
 
 //--------------- SET END ------------------//
@@ -265,3 +250,7 @@ type ForeignKeyStruct struct {
 }
 
 //--------------- KeyStruct END ------------------//
+
+func measureTime(ctx context.Context, start time.Time, functionName string) {
+	plugin.Logger(ctx).Debug(fmt.Sprintf("Function %s took %s\n", functionName, time.Since(start)))
+}

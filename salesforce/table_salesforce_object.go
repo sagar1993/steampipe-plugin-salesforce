@@ -51,7 +51,7 @@ var tableKeyStruct = []cache.KeyStruct{
 
 var cacheExpiration = 1 * time.Minute
 var cleanupInterval = 2 * time.Minute
-var batchSize = 200
+var batchSize = 500
 var idFormatter = func(id string) string {
 	return fmt.Sprintf("'%s'", id)
 }
@@ -60,6 +60,8 @@ var cacheUtil = cache.NewCacheUtil(tableKeyStruct, cacheExpiration, cleanupInter
 
 func listSalesforceObjectsByTable(tableName string, salesforceCols map[string]string) func(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData) (interface{}, error) {
 	return func(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData) (interface{}, error) {
+		startTime := time.Now()
+		defer measureTime(ctx, startTime, "listSalesforceObjectsByTable")
 		client, err := connect(ctx, d)
 		if err != nil {
 			plugin.Logger(ctx).Error("salesforce.listSalesforceObjectsByTable", "connection error", err)
@@ -70,8 +72,20 @@ func listSalesforceObjectsByTable(tableName string, salesforceCols map[string]st
 			return nil, fmt.Errorf("salesforce.listSalesforceObjectsByTable: client_not_found, unable to query table %s because of invalid steampipe salesforce configuration", d.Table.Name)
 		}
 
-		query := generateQuery(d.Table.Columns, tableName)
-		condition := buildQueryFromQuals(d.Quals, d.Table.Columns, salesforceCols)
+		requiredColumnNames := make(map[string]bool)
+		for _, element := range d.QueryContext.Columns {
+			requiredColumnNames[element] = true
+		}
+
+		var queryColumns []*plugin.Column
+		for _, column := range d.Table.Columns {
+			if _, ok := requiredColumnNames[column.Name]; ok {
+				queryColumns = append(queryColumns, column)
+			}
+		}
+
+		query := generateQuery(queryColumns, tableName)
+		condition := buildQueryFromQuals(d.Quals, queryColumns, salesforceCols)
 		if condition != "" {
 			query = fmt.Sprintf("%s where %s", query, condition)
 			plugin.Logger(ctx).Debug("salesforce.listSalesforceObjectsByTable", "table_name", d.Table.Name, "query_condition", condition)
@@ -106,7 +120,10 @@ func listSalesforceObjectsByTable(tableName string, salesforceCols map[string]st
 			}
 
 			for _, account := range *AccountList {
-				cacheUtil.AddIdsToForeignTableCache(getTableName(tableName), account)
+				cacheUtil.AddIdsToForeignTableCache(ctx, getTableName(tableName), account)
+			}
+
+			for _, account := range *AccountList {
 				d.StreamListItem(ctx, account)
 			}
 
@@ -123,6 +140,9 @@ func listSalesforceObjectsByTable(tableName string, salesforceCols map[string]st
 }
 
 func bulkDataPullByIds(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData, ids []string) (*[]map[string]interface{}, error) {
+	startTime := time.Now()
+	defer measureTime(ctx, startTime, "bulkDataPullByIds")
+
 	// make query call to get data and update cache
 	// make query call to get data
 	query := generateQuery(d.Table.Columns, getTableName(d.Table.Name))
@@ -146,23 +166,35 @@ func bulkDataPullByIds(ctx context.Context, d *plugin.QueryData, h *plugin.Hydra
 
 	plugin.Logger(ctx).Debug("salesforce.bulkDataPullByIds GET getting results for query : ", query)
 
-	result, err := client.Query(query)
-	if err != nil {
-		plugin.Logger(ctx).Error("salesforce.bulkDataPullByIds", "query error", err)
-		return nil, err
-	}
-
 	data := new([]map[string]interface{})
-	err = decodeQueryResult(ctx, result.Records, data)
-	if err != nil {
-		plugin.Logger(ctx).Error("salesforce.bulkDataPullByIds", "results decoding error", err)
-		return nil, err
+	for {
+		result, err := client.Query(query)
+		if err != nil {
+			plugin.Logger(ctx).Error("salesforce.bulkDataPullByIds", "query error", err)
+			return nil, err
+		}
+		temp := new([]map[string]interface{})
+		err = decodeQueryResult(ctx, result.Records, temp)
+		if err != nil {
+			plugin.Logger(ctx).Error("salesforce.bulkDataPullByIds", "results decoding error", err)
+			return nil, err
+		}
+		// Paging
+		if result.Done {
+			*data = append(*data, *temp...)
+			break
+		} else {
+			query = result.NextRecordsURL
+		}
+
 	}
 	return data, nil
 }
 
 func getSalesforceObjectbyID(tableName string) func(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData) (interface{}, error) {
 	return func(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData) (interface{}, error) {
+		startTime := time.Now()
+		defer measureTime(ctx, startTime, "getSalesforceObjectbyID")
 		plugin.Logger(ctx).Info("salesforce.getSalesforceObjectbyID", "Table_Name", d.Table.Name)
 		config := GetConfig(d.Connection)
 		var id string
@@ -237,4 +269,8 @@ func getTableName(input string) string {
 	}
 	// If the string doesn't start with "salesforce_", return it as is
 	return input
+}
+
+func measureTime(ctx context.Context, start time.Time, functionName string) {
+	plugin.Logger(ctx).Debug(fmt.Sprintf("Function %s took %s\n", functionName, time.Since(start)))
 }
