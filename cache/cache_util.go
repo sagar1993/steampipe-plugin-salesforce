@@ -147,12 +147,12 @@ func (c *CacheUtil) AddIdsToForeignTableCache(ctx context.Context, tableName str
 	}
 
 	// add record to the table cache
-	id, exists := record[keyStruct.Pk]
-	if exists {
-		if idValue, ok := id.(string); ok {
-			c.getCacheForTableName(tableName).Set(idValue, record, c.cacheExpiration)
-		}
-	}
+	// id, exists := record[keyStruct.Pk]
+	// if exists {
+	// 	if idValue, ok := id.(string); ok {
+	// 		c.getCacheForTableName(tableName).Set(idValue, record, c.cacheExpiration)
+	// 	}
+	// }
 }
 
 // The function is used along with the Get call in plugin, it returns the record from the cache if it exists

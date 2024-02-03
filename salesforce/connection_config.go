@@ -23,6 +23,7 @@ type salesforceConfig struct {
 	NamingConvention               *NamingConventionEnum `cty:"naming_convention"`
 	UserDefinedDynamicColumnConfig *string               `cty:"user_defined_dynamic_column_config"`
 	ResultSize                     *int                  `cty:"result_size"`
+	ShowResultSizeError            *bool                 `cty:"show_result_size_error"`
 }
 
 type UserDefinedDynamicColumnConfig struct {
@@ -64,6 +65,9 @@ var ConfigSchema = map[string]*schema.Attribute{
 	"result_size": {
 		Type: schema.TypeInt,
 	},
+	"show_result_size_error": {
+		Type: schema.TypeBool,
+	},
 }
 
 func ConfigInstance() interface{} {
@@ -75,6 +79,10 @@ func GetConfig(connection *plugin.Connection) salesforceConfig {
 	if connection == nil || connection.Config == nil {
 		return salesforceConfig{}
 	}
+	defaultShowResultSize := true
 	config, _ := connection.Config.(salesforceConfig)
+	if config.ShowResultSizeError == nil {
+		config.ShowResultSizeError = &defaultShowResultSize
+	}
 	return config
 }

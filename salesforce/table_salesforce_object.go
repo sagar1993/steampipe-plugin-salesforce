@@ -97,15 +97,17 @@ func listSalesforceObjectsByTable(tableName string, salesforceCols map[string]st
 		}
 
 		if salesforceConfig.ResultSize != nil {
-			intValue := *salesforceConfig.ResultSize
+			intValue := *salesforceConfig.ResultSize + 1
 			if 0 < intValue && intValue < math.MaxInt32 {
 				limitString := strconv.Itoa(intValue)
 				query = fmt.Sprintf("%s  limit %s", query, limitString)
 			}
 		}
-		plugin.Logger(ctx).Debug("## getting results for query : ", query)
 
+		var totalRecords int = 0
 		for {
+			plugin.Logger(ctx).Debug("salesforce.listSalesforceObjectsByTable getting results for query : ", query)
+
 			result, err := client.Query(query)
 			if err != nil {
 				plugin.Logger(ctx).Error("salesforce.listSalesforceObjectsByTable", "query error", err)
@@ -121,6 +123,10 @@ func listSalesforceObjectsByTable(tableName string, salesforceCols map[string]st
 
 			for _, account := range *AccountList {
 				cacheUtil.AddIdsToForeignTableCache(ctx, getTableName(tableName), account)
+				totalRecords += 1
+				if *salesforceConfig.ShowResultSizeError && totalRecords > *salesforceConfig.ResultSize {
+					return nil, fmt.Errorf("Result has more than %d records for %s . Please apply / modify filters.", *salesforceConfig.ResultSize, tableName)
+				}
 			}
 
 			for _, account := range *AccountList {
