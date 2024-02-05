@@ -49,8 +49,8 @@ var tableKeyStruct = []cache.KeyStruct{
 	},
 }
 
-var cacheExpiration = 1 * time.Minute
-var cleanupInterval = 2 * time.Minute
+var cacheExpiration = 30 * time.Second
+var cleanupInterval = 1 * time.Minute
 var batchSize = 500
 var idFormatter = func(id string) string {
 	return fmt.Sprintf("'%s'", id)
@@ -149,9 +149,20 @@ func bulkDataPullByIds(ctx context.Context, d *plugin.QueryData, h *plugin.Hydra
 	startTime := time.Now()
 	defer measureTime(ctx, startTime, "bulkDataPullByIds")
 
+	requiredColumnNames := make(map[string]bool)
+	for _, element := range d.QueryContext.Columns {
+		requiredColumnNames[element] = true
+	}
+
+	var queryColumns []*plugin.Column
+	for _, column := range d.Table.Columns {
+		if _, ok := requiredColumnNames[column.Name]; ok {
+			queryColumns = append(queryColumns, column)
+		}
+	}
 	// make query call to get data and update cache
 	// make query call to get data
-	query := generateQuery(d.Table.Columns, getTableName(d.Table.Name))
+	query := generateQuery(queryColumns, getTableName(d.Table.Name))
 
 	// Concatenate the values into a comma-separated string
 	inClause := strings.Join(ids, ",")

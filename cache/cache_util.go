@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/patrickmn/go-cache"
@@ -94,7 +95,7 @@ func (c *CacheUtil) getKeyStructForTableName(tableName string) *KeyStruct {
 // TODO create generator function for this
 // so that memory can be freed up
 // discards any entries in cache.
-func (c *CacheUtil) getKeysToPullInBatches(ctx context.Context, tableName string, batchSize int) [][]string {
+func (c *CacheUtil) getKeysToPullInBatches(ctx context.Context, tableName string, batchSize int, columns []string) [][]string {
 	startTime := time.Now()
 	defer measureTime(ctx, startTime, "getKeysToPullInBatches")
 
@@ -102,17 +103,33 @@ func (c *CacheUtil) getKeysToPullInBatches(ctx context.Context, tableName string
 	var currentTime = time.Now()
 	var currentBatch []string
 
-	cache := c.getCacheForTableName(tableName)
+	tableCache := c.getCacheForTableName(tableName)
 
 	var idSet *Set
 	idSet = c.getIdSetForTableName(tableName)
 
 	for key, time := range *idSet {
-		if cache != nil {
-			if record, exists := cache.Get(key); exists {
+		if tableCache != nil {
+			if record, exists := tableCache.Get(key); exists {
 				// if required element is already in cache increment TTL for the element in cache
-				cache.Set(key, record, c.cacheExpiration)
-				continue
+				tableCache.Set(key, record, c.cacheExpiration)
+				columnsFound := true
+				if recordCache, ok := record.(*cache.Cache); ok {
+					for _, column := range columns {
+						if value, exists := recordCache.Get(column); exists {
+							// if the required column is present in the record, increment TTL for the element in cache
+							recordCache.Set(column, value, c.cacheExpiration)
+						} else {
+							columnsFound = false
+							break
+						}
+					}
+				}
+				if columnsFound {
+					// if all the required columns are present in the record,
+					// then we don't need to pull the record
+					continue
+				}
 			}
 		}
 
@@ -130,6 +147,26 @@ func (c *CacheUtil) getKeysToPullInBatches(ctx context.Context, tableName string
 		result = append(result, currentBatch)
 	}
 	return result
+}
+
+func (c *CacheUtil) AddRecordToTableCache(ctx context.Context, tableName string, id string, updatedRecord map[string]interface{}) {
+	tableCache := c.getCacheForTableName(tableName)
+
+	if record, exists := tableCache.Get(id); exists {
+		// if required element is already in cache increment TTL for the element in cache
+		tableCache.Set(id, record, c.cacheExpiration)
+		if recordCache, ok := record.(*cache.Cache); ok {
+			for column, value := range updatedRecord {
+				recordCache.Set(column, value, c.cacheExpiration)
+			}
+		}
+	} else {
+		recordCache := cache.New(c.cacheExpiration, c.cleanupInterval)
+		for column, value := range updatedRecord {
+			recordCache.Set(column, value, c.cacheExpiration)
+		}
+		tableCache.Set(id, recordCache, c.cacheExpiration)
+	}
 }
 
 // The function is used along with the List call in plugin and adds the ids to the id cache of the foreign table
@@ -150,7 +187,7 @@ func (c *CacheUtil) AddIdsToForeignTableCache(ctx context.Context, tableName str
 	// id, exists := record[keyStruct.Pk]
 	// if exists {
 	// 	if idValue, ok := id.(string); ok {
-	// 		c.getCacheForTableName(tableName).Set(idValue, record, c.cacheExpiration)
+	// 		c.AddRecordToTableCache(ctx, tableName, idValue, record)
 	// 	}
 	// }
 }
@@ -159,53 +196,61 @@ func (c *CacheUtil) AddIdsToForeignTableCache(ctx context.Context, tableName str
 // otherwise it pulls the records from the data source and adds it to the cache
 func (c *CacheUtil) GetRecordByIdAndBuildCache(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData, tableName string, idToReturn string) (interface{}, error) {
 	var tableCache = c.getCacheForTableName(tableName)
-	var idSet = c.getIdSetForTableName(tableName)
 	var keyStruct = c.getKeyStructForTableName(tableName)
 
 	//--------------- Getting values from the cache ------------------//
 
-	if value, exists := tableCache.Get(idToReturn); exists {
-		return value, nil
+	if record, exists := tableCache.Get(idToReturn); exists {
+		return GetResultMapFromCache(record.(*cache.Cache))
 	} else {
 		plugin.Logger(ctx).Debug("salesforce.GetRecordByIdAndBuildCache ID not present in cache 1st check ", idToReturn)
 	}
 
 	//--------------- Build cache in batches ------------------//
-	var batches = c.getKeysToPullInBatches(ctx, tableName, c.batchSize)
+	var batches = c.getKeysToPullInBatches(ctx, tableName, c.batchSize, d.QueryContext.Columns)
+
+	var wg sync.WaitGroup
 
 	for _, batch := range batches {
 
-		DataList, err := keyStruct.BulkDataPullByIds(ctx, d, h, batch)
-		if err != nil {
-			plugin.Logger(ctx).Debug("salesforce.GetRecordByIdAndBuildCache", "results decoding error", err)
-		}
+		wg.Add(1)
 
-		for _, record := range *DataList {
-			// Accessing a specific key
-			id, exists := record[keyStruct.Pk]
-			if exists {
-				// Convert the interface{} to a string using type assertion
-				if idValue, ok := id.(string); ok {
-					// Setting the value in the cache
-					tableCache.Set(idValue, record, c.cacheExpiration)
-					// Removing the id from the set
-					idSet.Remove(idValue)
-
-					c.AddIdsToForeignTableCache(ctx, tableName, record)
-
-				} else {
-					plugin.Logger(ctx).Debug("salesforce.GetRecordByIdAndBuildCache cache set failed ", id, " id value ", idValue)
-				}
-			} else {
-				plugin.Logger(ctx).Debug("salesforce.GetRecordByIdAndBuildCache cache set idString does not exists", id, " value ", record)
+		go func() {
+			DataList, err := keyStruct.BulkDataPullByIds(ctx, d, h, batch)
+			if err != nil {
+				plugin.Logger(ctx).Debug("salesforce.GetRecordByIdAndBuildCache", "results decoding error", err)
 			}
-		}
+
+			for _, record := range *DataList {
+				// Accessing a specific key
+				id, exists := record[keyStruct.Pk]
+				if exists {
+					// Convert the interface{} to a string using type assertion
+					if idValue, ok := id.(string); ok {
+						// Setting the value in the cache
+						c.AddRecordToTableCache(ctx, tableName, idValue, record)
+						// tableCache.Set(idValue, record, c.cacheExpiration)
+						// Removing the id from the set
+						// idSet.Remove(idValue)
+
+						c.AddIdsToForeignTableCache(ctx, tableName, record)
+
+					} else {
+						plugin.Logger(ctx).Debug("salesforce.GetRecordByIdAndBuildCache cache set failed ", id, " id value ", idValue)
+					}
+				} else {
+					plugin.Logger(ctx).Debug("salesforce.GetRecordByIdAndBuildCache cache set idString does not exists", id, " value ", record)
+				}
+			}
+			wg.Done()
+		}()
+		wg.Wait()
 	}
 
 	//--------------- Getting values from the cache built------------------//
 
-	if value, exists := tableCache.Get(idToReturn); exists {
-		return value, nil
+	if record, exists := tableCache.Get(idToReturn); exists {
+		return GetResultMapFromCache(record.(*cache.Cache))
 	} else {
 		plugin.Logger(ctx).Debug("salesforce.GetRecordByIdAndBuildCache not present in cache ", idToReturn)
 	}
@@ -253,4 +298,14 @@ type ForeignKeyStruct struct {
 
 func measureTime(ctx context.Context, start time.Time, functionName string) {
 	plugin.Logger(ctx).Debug(fmt.Sprintf("Function %s took %s\n", functionName, time.Since(start)))
+}
+
+func GetResultMapFromCache(record *cache.Cache) (map[string]interface{}, error) {
+	result := make(map[string]interface{})
+	// Iterating through the items in the cache
+	for key, value := range record.Items() {
+		// Adding each item to the result map
+		result[key] = value.Object
+	}
+	return result, nil
 }
