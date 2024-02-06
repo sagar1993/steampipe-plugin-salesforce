@@ -125,7 +125,7 @@ func listSalesforceObjectsByTable(tableName string, salesforceCols map[string]st
 				cacheUtil.AddIdsToForeignTableCache(ctx, getTableName(tableName), account)
 				totalRecords += 1
 				if *salesforceConfig.ShowResultSizeError && totalRecords > *salesforceConfig.ResultSize {
-					return nil, fmt.Errorf("Result has more than %d records for %s . Please apply / modify filters.", *salesforceConfig.ResultSize, tableName)
+					return nil, fmt.Errorf("Query returned too many rows, please add a few filters to reduce it.")
 				}
 			}
 
