@@ -56,6 +56,9 @@ var idFormatter = func(id string) string {
 	return fmt.Sprintf("'%s'", id)
 }
 
+// map of column name to column object
+var queryColumnsMap map[string]*plugin.Column
+
 var cacheUtil = cache.NewCacheUtil(tableKeyStruct, cacheExpiration, cleanupInterval, batchSize, idFormatter)
 
 func listSalesforceObjectsByTable(tableName string, salesforceCols map[string]string) func(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData) (interface{}, error) {
@@ -72,14 +75,15 @@ func listSalesforceObjectsByTable(tableName string, salesforceCols map[string]st
 			return nil, fmt.Errorf("salesforce.listSalesforceObjectsByTable: client_not_found, unable to query table %s because of invalid steampipe salesforce configuration", d.Table.Name)
 		}
 
-		requiredColumnNames := make(map[string]bool)
-		for _, element := range d.QueryContext.Columns {
-			requiredColumnNames[element] = true
+		if (queryColumnsMap == nil) || (len(queryColumnsMap) == 0) {
+			queryColumnsMap = make(map[string]*plugin.Column)
+			for _, column := range d.Table.Columns {
+				queryColumnsMap[column.Name] = column
+			}
 		}
-
 		var queryColumns []*plugin.Column
-		for _, column := range d.Table.Columns {
-			if _, ok := requiredColumnNames[column.Name]; ok {
+		for _, element := range d.QueryContext.Columns {
+			if column, ok := queryColumnsMap[element]; ok {
 				queryColumns = append(queryColumns, column)
 			}
 		}
@@ -149,14 +153,15 @@ func bulkDataPullByIds(ctx context.Context, d *plugin.QueryData, h *plugin.Hydra
 	startTime := time.Now()
 	defer measureTime(ctx, startTime, "bulkDataPullByIds")
 
-	requiredColumnNames := make(map[string]bool)
-	for _, element := range d.QueryContext.Columns {
-		requiredColumnNames[element] = true
+	if (queryColumnsMap == nil) || (len(queryColumnsMap) == 0) {
+		queryColumnsMap = make(map[string]*plugin.Column)
+		for _, column := range d.Table.Columns {
+			queryColumnsMap[column.Name] = column
+		}
 	}
-
 	var queryColumns []*plugin.Column
-	for _, column := range d.Table.Columns {
-		if _, ok := requiredColumnNames[column.Name]; ok {
+	for _, element := range d.QueryContext.Columns {
+		if column, ok := queryColumnsMap[element]; ok {
 			queryColumns = append(queryColumns, column)
 		}
 	}

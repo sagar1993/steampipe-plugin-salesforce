@@ -305,8 +305,11 @@ func dynamicColumns(ctx context.Context, client *simpleforce.Client, salesforceT
 		}
 
 		if len(userDefinedDynamicColumns) != 0 && userDefinedDynamicColumns[columnFieldName] != true {
+			plugin.Logger(ctx).Info("salesforce.dynamicColumns", fmt.Sprintf("Ignoring column %s ", columnFieldName))
 			continue
 		}
+
+		plugin.Logger(ctx).Info("salesforce.dynamicColumns", fmt.Sprintf("Adding column %s ", columnFieldName))
 
 		column := plugin.Column{
 			Name:        columnFieldName,
