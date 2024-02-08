@@ -49,8 +49,8 @@ var tableKeyStruct = []cache.KeyStruct{
 	},
 }
 
-var cacheExpiration = 30 * time.Second
-var cleanupInterval = 1 * time.Minute
+var cacheExpiration = 10 * time.Minute
+var cleanupInterval = 10 * time.Minute
 var batchSize = 500
 var idFormatter = func(id string) string {
 	return fmt.Sprintf("'%s'", id)
