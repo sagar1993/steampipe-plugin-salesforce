@@ -10,6 +10,7 @@ import (
 
 	"github.com/iancoleman/strcase"
 	"github.com/turbot/steampipe-plugin-salesforce/cache"
+	"github.com/turbot/steampipe-plugin-sdk/v5/grpc/proto"
 	"github.com/turbot/steampipe-plugin-sdk/v5/plugin"
 	"github.com/turbot/steampipe-plugin-sdk/v5/plugin/transform"
 )
@@ -85,6 +86,8 @@ func listSalesforceObjectsByTable(tableName string, salesforceCols map[string]st
 		for _, element := range d.QueryContext.Columns {
 			if column, ok := queryColumnsMap[element]; ok {
 				queryColumns = append(queryColumns, column)
+			} else {
+				plugin.Logger(ctx).Error("salesforce.listSalesforceObjectsByTable", "no column found", queryColumnsMap, element)
 			}
 		}
 
@@ -126,6 +129,13 @@ func listSalesforceObjectsByTable(tableName string, salesforceCols map[string]st
 			}
 
 			for _, account := range *AccountList {
+				for col_name, col_value := range account {
+					if column_obj, ok := queryColumnsMap[strcase.ToSnake(col_name)]; ok {
+						if column_obj.Type == proto.ColumnType_STRING {
+							account[col_name] = strings.ToLower(col_value.(string))
+						}
+					}
+				}
 				cacheUtil.AddIdsToForeignTableCache(ctx, getTableName(tableName), account)
 				totalRecords += 1
 				if *salesforceConfig.ShowResultSizeError && totalRecords > *salesforceConfig.ResultSize {
@@ -200,6 +210,15 @@ func bulkDataPullByIds(ctx context.Context, d *plugin.QueryData, h *plugin.Hydra
 		if err != nil {
 			plugin.Logger(ctx).Error("salesforce.bulkDataPullByIds", "results decoding error", err)
 			return nil, err
+		}
+		for _, data := range *temp {
+			for col_name, col_value := range data {
+				if column_obj, ok := queryColumnsMap[strcase.ToSnake(col_name)]; ok {
+					if column_obj.Type == proto.ColumnType_STRING {
+						data[col_name] = strings.ToLower(col_value.(string))
+					}
+				}
+			}
 		}
 		// Paging
 		if result.Done {

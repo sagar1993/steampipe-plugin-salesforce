@@ -244,8 +244,8 @@ func (c *CacheUtil) GetRecordByIdAndBuildCache(ctx context.Context, d *plugin.Qu
 			}
 			wg.Done()
 		}()
-		wg.Wait()
 	}
+	wg.Wait()
 
 	//--------------- Getting values from the cache built------------------//
 
