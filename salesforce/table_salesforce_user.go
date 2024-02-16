@@ -32,15 +32,22 @@ func SalesforceUser(ctx context.Context, dm dynamicMap, config salesforceConfig)
 		{Name: "user_type", Type: proto.ColumnType_STRING, Description: "The category of user license. Can be one of Standard, PowerPartner, CSPLitePortal, CustomerSuccess, PowerCustomerSuccess, CsnOnly, and Guest."},
 	})
 
+	plugin.Logger(ctx).Debug("SalesforceUser init")
+
+	queryColumnsMap := make(map[string]*plugin.Column)
+	for _, column := range columns {
+		queryColumnsMap[column.Name] = column
+	}
+
 	return &plugin.Table{
 		Name:        "salesforce_user",
 		Description: "Represents a user in organization.",
 		List: &plugin.ListConfig{
-			Hydrate:    listSalesforceObjectsByTable(tableName, dm.salesforceColumns),
+			Hydrate:    listSalesforceObjectsByTable(tableName, dm.salesforceColumns, queryColumnsMap),
 			KeyColumns: getKeyColumns(columns),
 		},
 		Get: &plugin.GetConfig{
-			Hydrate:    getSalesforceObjectbyID(tableName),
+			Hydrate:    getSalesforceObjectbyID(tableName, queryColumnsMap),
 			KeyColumns: plugin.SingleColumn(checkNameScheme(config, dm.cols)),
 		},
 		Columns: columns,

@@ -49,15 +49,22 @@ func SalesforceOpportunity(ctx context.Context, dm dynamicMap, config salesforce
 		{Name: "type", Type: proto.ColumnType_STRING, Description: "Type of opportunity, such as Existing Business or New Business."},
 	})
 
+	plugin.Logger(ctx).Debug("SalesforceOpportunity init")
+
+	queryColumnsMap := make(map[string]*plugin.Column)
+	for _, column := range columns {
+		queryColumnsMap[column.Name] = column
+	}
+
 	return &plugin.Table{
 		Name:        "salesforce_opportunity",
 		Description: "Represents an opportunity, which is a sale or pending deal.",
 		List: &plugin.ListConfig{
-			Hydrate:    listSalesforceObjectsByTable(tableName, dm.salesforceColumns),
+			Hydrate:    listSalesforceObjectsByTable(tableName, dm.salesforceColumns, queryColumnsMap),
 			KeyColumns: getKeyColumns(columns),
 		},
 		Get: &plugin.GetConfig{
-			Hydrate:    getSalesforceObjectbyID(tableName),
+			Hydrate:    getSalesforceObjectbyID(tableName, queryColumnsMap),
 			KeyColumns: plugin.SingleColumn(checkNameScheme(config, dm.cols)),
 		},
 		Columns: columns,

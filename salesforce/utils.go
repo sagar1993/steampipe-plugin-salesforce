@@ -310,8 +310,6 @@ func dynamicColumns(ctx context.Context, client *simpleforce.Client, salesforceT
 			continue
 		}
 
-		plugin.Logger(ctx).Info("salesforce.dynamicColumns", fmt.Sprintf("Adding column %s ", columnFieldName))
-
 		column := plugin.Column{
 			Name:        columnFieldName,
 			Description: fmt.Sprintf("%s.", fields["label"].(string)),

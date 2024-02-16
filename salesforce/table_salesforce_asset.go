@@ -47,15 +47,20 @@ func SalesforceAsset(ctx context.Context, dm dynamicMap, config salesforceConfig
 		{Name: "usage_end_date", Type: proto.ColumnType_TIMESTAMP, Description: "Date when usage for this asset ends or expires."},
 	})
 
+	queryColumnsMap := make(map[string]*plugin.Column)
+	for _, column := range columns {
+		queryColumnsMap[column.Name] = column
+	}
+
 	return &plugin.Table{
 		Name:        "salesforce_asset",
 		Description: "Represents an item of commercial value, such as a product sold by your company or a competitor, that a customer has purchased and installed.",
 		List: &plugin.ListConfig{
-			Hydrate:    listSalesforceObjectsByTable(tableName, dm.salesforceColumns),
+			Hydrate:    listSalesforceObjectsByTable(tableName, dm.salesforceColumns, queryColumnsMap),
 			KeyColumns: getKeyColumns(columns),
 		},
 		Get: &plugin.GetConfig{
-			Hydrate:    getSalesforceObjectbyID(tableName),
+			Hydrate:    getSalesforceObjectbyID(tableName, queryColumnsMap),
 			KeyColumns: plugin.SingleColumn(checkNameScheme(config, dm.cols)),
 		},
 		Columns: columns,

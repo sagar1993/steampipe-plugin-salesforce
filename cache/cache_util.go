@@ -194,7 +194,7 @@ func (c *CacheUtil) AddIdsToForeignTableCache(ctx context.Context, tableName str
 
 // The function is used along with the Get call in plugin, it returns the record from the cache if it exists
 // otherwise it pulls the records from the data source and adds it to the cache
-func (c *CacheUtil) GetRecordByIdAndBuildCache(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData, tableName string, idToReturn string) (interface{}, error) {
+func (c *CacheUtil) GetRecordByIdAndBuildCache(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData, tableName string, idToReturn string, queryColumnsMap map[string]*plugin.Column) (interface{}, error) {
 	var tableCache = c.getCacheForTableName(tableName)
 	var keyStruct = c.getKeyStructForTableName(tableName)
 
@@ -216,7 +216,7 @@ func (c *CacheUtil) GetRecordByIdAndBuildCache(ctx context.Context, d *plugin.Qu
 		wg.Add(1)
 
 		go func() {
-			DataList, err := keyStruct.BulkDataPullByIds(ctx, d, h, batch)
+			DataList, err := keyStruct.BulkDataPullByIds(ctx, d, h, batch, queryColumnsMap)
 			if err != nil {
 				plugin.Logger(ctx).Debug("salesforce.GetRecordByIdAndBuildCache", "results decoding error", err)
 			}
@@ -280,7 +280,7 @@ func (s Set) Contains(element string) time.Time {
 
 //--------------- KeyStruct ------------------//
 
-type BulkDataPullByIdsFunc func(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData, ids []string) (*[]map[string]interface{}, error)
+type BulkDataPullByIdsFunc func(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData, ids []string, queryColumnsMap map[string]*plugin.Column) (*[]map[string]interface{}, error)
 
 type KeyStruct struct {
 	Name              string

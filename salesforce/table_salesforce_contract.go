@@ -46,15 +46,22 @@ func SalesforceContract(ctx context.Context, dm dynamicMap, config salesforceCon
 		{Name: "system_modstamp", Type: proto.ColumnType_TIMESTAMP, Description: "The date and time when contract was last modified by a user or by an automated process."},
 	})
 
+	plugin.Logger(ctx).Debug("SalesforceContract init")
+
+	queryColumnsMap := make(map[string]*plugin.Column)
+	for _, column := range columns {
+		queryColumnsMap[column.Name] = column
+	}
+
 	return &plugin.Table{
 		Name:        "salesforce_contract",
 		Description: "Represents a contract (a business agreement) associated with an Account.",
 		List: &plugin.ListConfig{
-			Hydrate:    listSalesforceObjectsByTable(tableName, dm.salesforceColumns),
+			Hydrate:    listSalesforceObjectsByTable(tableName, dm.salesforceColumns, queryColumnsMap),
 			KeyColumns: getKeyColumns(columns),
 		},
 		Get: &plugin.GetConfig{
-			Hydrate:    getSalesforceObjectbyID(tableName),
+			Hydrate:    getSalesforceObjectbyID(tableName, queryColumnsMap),
 			KeyColumns: plugin.SingleColumn(checkNameScheme(config, dm.cols)),
 		},
 		Columns: columns,

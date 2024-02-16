@@ -57,12 +57,9 @@ var idFormatter = func(id string) string {
 	return fmt.Sprintf("'%s'", id)
 }
 
-// map of column name to column object
-var queryColumnsMap map[string]*plugin.Column
-
 var cacheUtil = cache.NewCacheUtil(tableKeyStruct, cacheExpiration, cleanupInterval, batchSize, idFormatter)
 
-func listSalesforceObjectsByTable(tableName string, salesforceCols map[string]string) func(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData) (interface{}, error) {
+func listSalesforceObjectsByTable(tableName string, salesforceCols map[string]string, queryColumnsMap map[string]*plugin.Column) func(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData) (interface{}, error) {
 	return func(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData) (interface{}, error) {
 		startTime := time.Now()
 		defer measureTime(ctx, startTime, "listSalesforceObjectsByTable")
@@ -76,12 +73,6 @@ func listSalesforceObjectsByTable(tableName string, salesforceCols map[string]st
 			return nil, fmt.Errorf("salesforce.listSalesforceObjectsByTable: client_not_found, unable to query table %s because of invalid steampipe salesforce configuration", d.Table.Name)
 		}
 
-		if (queryColumnsMap == nil) || (len(queryColumnsMap) == 0) {
-			queryColumnsMap = make(map[string]*plugin.Column)
-			for _, column := range d.Table.Columns {
-				queryColumnsMap[column.Name] = column
-			}
-		}
 		var queryColumns []*plugin.Column
 		for _, element := range d.QueryContext.Columns {
 			if column, ok := queryColumnsMap[element]; ok {
@@ -111,8 +102,6 @@ func listSalesforceObjectsByTable(tableName string, salesforceCols map[string]st
 			}
 		}
 
-		case_sensitive_search := salesforceConfig.CaseSenistiveSearch
-
 		var totalRecords int = 0
 		for {
 			plugin.Logger(ctx).Debug("salesforce.listSalesforceObjectsByTable getting results for query : ", query)
@@ -131,12 +120,10 @@ func listSalesforceObjectsByTable(tableName string, salesforceCols map[string]st
 			}
 
 			for _, account := range *AccountList {
-				if *case_sensitive_search {
-					for col_name, col_value := range account {
-						if column_obj, ok := queryColumnsMap[strcase.ToSnake(col_name)]; ok {
-							if column_obj.Type == proto.ColumnType_STRING && col_value != nil {
-								account[col_name] = strings.ToLower(col_value.(string))
-							}
+				for col_name, col_value := range account {
+					if column_obj, ok := queryColumnsMap[strcase.ToSnake(col_name)]; ok {
+						if column_obj.Type == proto.ColumnType_STRING && col_value != nil && !strings.HasSuffix(col_name, "id") && !strings.HasSuffix(col_name, "Id") {
+							account[col_name] = strings.ToLower(col_value.(string))
 						}
 					}
 				}
@@ -163,19 +150,10 @@ func listSalesforceObjectsByTable(tableName string, salesforceCols map[string]st
 	}
 }
 
-func bulkDataPullByIds(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData, ids []string) (*[]map[string]interface{}, error) {
+func bulkDataPullByIds(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData, ids []string, queryColumnsMap map[string]*plugin.Column) (*[]map[string]interface{}, error) {
 	startTime := time.Now()
 	defer measureTime(ctx, startTime, "bulkDataPullByIds")
 
-	salesforceConfig := GetConfig(d.Connection)
-	case_sensitive_search := salesforceConfig.CaseSenistiveSearch
-
-	if (queryColumnsMap == nil) || (len(queryColumnsMap) == 0) {
-		queryColumnsMap = make(map[string]*plugin.Column)
-		for _, column := range d.Table.Columns {
-			queryColumnsMap[column.Name] = column
-		}
-	}
 	var queryColumns []*plugin.Column
 	for _, element := range d.QueryContext.Columns {
 		if column, ok := queryColumnsMap[element]; ok {
@@ -218,13 +196,11 @@ func bulkDataPullByIds(ctx context.Context, d *plugin.QueryData, h *plugin.Hydra
 			plugin.Logger(ctx).Error("salesforce.bulkDataPullByIds", "results decoding error", err)
 			return nil, err
 		}
-		if *case_sensitive_search {
-			for _, data := range *temp {
-				for col_name, col_value := range data {
-					if column_obj, ok := queryColumnsMap[strcase.ToSnake(col_name)]; ok {
-						if column_obj.Type == proto.ColumnType_STRING && col_value != nil {
-							data[col_name] = strings.ToLower(col_value.(string))
-						}
+		for _, data := range *temp {
+			for col_name, col_value := range data {
+				if column_obj, ok := queryColumnsMap[strcase.ToSnake(col_name)]; ok {
+					if column_obj.Type == proto.ColumnType_STRING && col_value != nil && !strings.HasSuffix(col_name, "id") && !strings.HasSuffix(col_name, "Id") {
+						data[col_name] = strings.ToLower(col_value.(string))
 					}
 				}
 			}
@@ -241,7 +217,7 @@ func bulkDataPullByIds(ctx context.Context, d *plugin.QueryData, h *plugin.Hydra
 	return data, nil
 }
 
-func getSalesforceObjectbyID(tableName string) func(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData) (interface{}, error) {
+func getSalesforceObjectbyID(tableName string, queryColumnsMap map[string]*plugin.Column) func(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData) (interface{}, error) {
 	return func(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData) (interface{}, error) {
 		startTime := time.Now()
 		defer measureTime(ctx, startTime, "getSalesforceObjectbyID")
@@ -257,7 +233,7 @@ func getSalesforceObjectbyID(tableName string) func(ctx context.Context, d *plug
 			return nil, nil
 		}
 
-		record, err := cacheUtil.GetRecordByIdAndBuildCache(ctx, d, h, getTableName(tableName), id)
+		record, err := cacheUtil.GetRecordByIdAndBuildCache(ctx, d, h, getTableName(tableName), id, queryColumnsMap)
 		if record != nil {
 			return record, nil
 		}

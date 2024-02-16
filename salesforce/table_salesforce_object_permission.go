@@ -25,15 +25,22 @@ func SalesforceObjectPermission(ctx context.Context, dm dynamicMap, config sales
 		{Name: "permissions_view_all_records", Type: proto.ColumnType_BOOL, Description: "If true, users assigned to the parent PermissionSet can view all records for this object, regardless of sharing settings. Requires PermissionsRead for the same object to be true."},
 	})
 
+	plugin.Logger(ctx).Debug("SalesforceObjectPermission init")
+
+	queryColumnsMap := make(map[string]*plugin.Column)
+	for _, column := range columns {
+		queryColumnsMap[column.Name] = column
+	}
+
 	return &plugin.Table{
 		Name:        "salesforce_object_permission",
 		Description: "Represents the enabled object permissions for the parent PermissionSet.",
 		List: &plugin.ListConfig{
-			Hydrate:    listSalesforceObjectsByTable(tableName, dm.salesforceColumns),
+			Hydrate:    listSalesforceObjectsByTable(tableName, dm.salesforceColumns, queryColumnsMap),
 			KeyColumns: getKeyColumns(columns),
 		},
 		Get: &plugin.GetConfig{
-			Hydrate:    getSalesforceObjectbyID(tableName),
+			Hydrate:    getSalesforceObjectbyID(tableName, queryColumnsMap),
 			KeyColumns: plugin.SingleColumn(checkNameScheme(config, dm.cols)),
 		},
 		Columns: columns,

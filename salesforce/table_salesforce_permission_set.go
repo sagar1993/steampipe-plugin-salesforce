@@ -32,15 +32,22 @@ func SalesforcePermissionSet(ctx context.Context, dm dynamicMap, config salesfor
 		{Name: "system_modstamp", Type: proto.ColumnType_TIMESTAMP, Description: "The date and time when order record was last modified by a user or by an automated process."},
 	})
 
+	plugin.Logger(ctx).Debug("SalesforcePermissionSet init")
+
+	queryColumnsMap := make(map[string]*plugin.Column)
+	for _, column := range columns {
+		queryColumnsMap[column.Name] = column
+	}
+
 	return &plugin.Table{
 		Name:        "salesforce_permission_set",
 		Description: "Represents a set of permissions that's used to grant more access to one or more users without changing their profile or reassigning profiles.",
 		List: &plugin.ListConfig{
-			Hydrate:    listSalesforceObjectsByTable(tableName, dm.salesforceColumns),
+			Hydrate:    listSalesforceObjectsByTable(tableName, dm.salesforceColumns, queryColumnsMap),
 			KeyColumns: getKeyColumns(columns),
 		},
 		Get: &plugin.GetConfig{
-			Hydrate:    getSalesforceObjectbyID(tableName),
+			Hydrate:    getSalesforceObjectbyID(tableName, queryColumnsMap),
 			KeyColumns: plugin.SingleColumn(checkNameScheme(config, dm.cols)),
 		},
 		Columns: columns,

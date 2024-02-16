@@ -43,15 +43,22 @@ func SalesforceAccount(ctx context.Context, dm dynamicMap, config salesforceConf
 		{Name: "shipping_address", Type: proto.ColumnType_JSON, Description: "The shipping adress of the account."},
 	})
 
+	plugin.Logger(ctx).Debug("SalesforceAccount init")
+
+	queryColumnsMap := make(map[string]*plugin.Column)
+	for _, column := range columns {
+		queryColumnsMap[column.Name] = column
+	}
+
 	return &plugin.Table{
 		Name:        "salesforce_account",
 		Description: "Represents an individual account, which is an organization or person involved with business (such as customers, competitors, and partners).",
 		List: &plugin.ListConfig{
-			Hydrate:    listSalesforceObjectsByTable(tableName, dm.salesforceColumns),
+			Hydrate:    listSalesforceObjectsByTable(tableName, dm.salesforceColumns, queryColumnsMap),
 			KeyColumns: getKeyColumns(columns),
 		},
 		Get: &plugin.GetConfig{
-			Hydrate:    getSalesforceObjectbyID(tableName),
+			Hydrate:    getSalesforceObjectbyID(tableName, queryColumnsMap),
 			KeyColumns: plugin.SingleColumn(checkNameScheme(config, dm.cols)),
 		},
 		Columns: columns,

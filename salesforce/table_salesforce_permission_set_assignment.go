@@ -18,15 +18,22 @@ func SalesforcePermissionSetAssignment(ctx context.Context, dm dynamicMap, confi
 		{Name: "system_modstamp", Type: proto.ColumnType_TIMESTAMP, Description: "The Date Assigned."},
 	})
 
+	plugin.Logger(ctx).Debug("SalesforcePermissionSetAssignment init")
+
+	queryColumnsMap := make(map[string]*plugin.Column)
+	for _, column := range columns {
+		queryColumnsMap[column.Name] = column
+	}
+
 	return &plugin.Table{
 		Name:        "salesforce_permission_set_assignment",
 		Description: "Represents the association between a User and a PermissionSet.",
 		List: &plugin.ListConfig{
-			Hydrate:    listSalesforceObjectsByTable(tableName, dm.salesforceColumns),
+			Hydrate:    listSalesforceObjectsByTable(tableName, dm.salesforceColumns, queryColumnsMap),
 			KeyColumns: getKeyColumns(columns),
 		},
 		Get: &plugin.GetConfig{
-			Hydrate:    getSalesforceObjectbyID(tableName),
+			Hydrate:    getSalesforceObjectbyID(tableName, queryColumnsMap),
 			KeyColumns: plugin.SingleColumn(checkNameScheme(config, dm.cols)),
 		},
 		Columns: columns,

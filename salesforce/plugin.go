@@ -96,6 +96,8 @@ func pluginTableDefinitions(ctx context.Context, td *plugin.TableMapData) (map[s
 	// Initialize tables with static tables with static and dynamic columns(if credentials are set)
 	var tables map[string]*plugin.Table
 
+	plugin.Logger(ctx).Debug("pluginTableDefinitions init")
+
 	// check the NamingConvention parameter value in config
 	if config.NamingConvention != nil && *config.NamingConvention == "api_native" {
 		tables = map[string]*plugin.Table{
@@ -287,16 +289,21 @@ func generateDynamicTables(ctx context.Context, client *simpleforce.Client, conf
 		cols = append(cols, &column)
 	}
 
+	queryColumnsMap := make(map[string]*plugin.Column)
+	for _, column := range cols {
+		queryColumnsMap[column.Name] = column
+	}
+
 	Table := plugin.Table{
 		Name:        tableName,
 		Description: fmt.Sprintf("Represents Salesforce object %s.", salesforceObjectMetadata["name"]),
 		List: &plugin.ListConfig{
 			KeyColumns: keyColumns,
-			Hydrate:    listSalesforceObjectsByTable(salesforceTableName, salesforceCols),
+			Hydrate:    listSalesforceObjectsByTable(salesforceTableName, salesforceCols, queryColumnsMap),
 		},
 		Get: &plugin.GetConfig{
 			KeyColumns: plugin.SingleColumn(checkNameScheme(config, cols)),
-			Hydrate:    getSalesforceObjectbyID(salesforceTableName),
+			Hydrate:    getSalesforceObjectbyID(salesforceTableName, queryColumnsMap),
 		},
 		Columns: cols,
 	}
