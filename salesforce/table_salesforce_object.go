@@ -111,6 +111,8 @@ func listSalesforceObjectsByTable(tableName string, salesforceCols map[string]st
 			}
 		}
 
+		case_sensitive_search := salesforceConfig.CaseSenistiveSearch
+
 		var totalRecords int = 0
 		for {
 			plugin.Logger(ctx).Debug("salesforce.listSalesforceObjectsByTable getting results for query : ", query)
@@ -129,10 +131,12 @@ func listSalesforceObjectsByTable(tableName string, salesforceCols map[string]st
 			}
 
 			for _, account := range *AccountList {
-				for col_name, col_value := range account {
-					if column_obj, ok := queryColumnsMap[strcase.ToSnake(col_name)]; ok {
-						if column_obj.Type == proto.ColumnType_STRING {
-							account[col_name] = strings.ToLower(col_value.(string))
+				if *case_sensitive_search {
+					for col_name, col_value := range account {
+						if column_obj, ok := queryColumnsMap[strcase.ToSnake(col_name)]; ok {
+							if column_obj.Type == proto.ColumnType_STRING && col_value != nil {
+								account[col_name] = strings.ToLower(col_value.(string))
+							}
 						}
 					}
 				}
@@ -162,6 +166,9 @@ func listSalesforceObjectsByTable(tableName string, salesforceCols map[string]st
 func bulkDataPullByIds(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData, ids []string) (*[]map[string]interface{}, error) {
 	startTime := time.Now()
 	defer measureTime(ctx, startTime, "bulkDataPullByIds")
+
+	salesforceConfig := GetConfig(d.Connection)
+	case_sensitive_search := salesforceConfig.CaseSenistiveSearch
 
 	if (queryColumnsMap == nil) || (len(queryColumnsMap) == 0) {
 		queryColumnsMap = make(map[string]*plugin.Column)
@@ -211,11 +218,13 @@ func bulkDataPullByIds(ctx context.Context, d *plugin.QueryData, h *plugin.Hydra
 			plugin.Logger(ctx).Error("salesforce.bulkDataPullByIds", "results decoding error", err)
 			return nil, err
 		}
-		for _, data := range *temp {
-			for col_name, col_value := range data {
-				if column_obj, ok := queryColumnsMap[strcase.ToSnake(col_name)]; ok {
-					if column_obj.Type == proto.ColumnType_STRING {
-						data[col_name] = strings.ToLower(col_value.(string))
+		if *case_sensitive_search {
+			for _, data := range *temp {
+				for col_name, col_value := range data {
+					if column_obj, ok := queryColumnsMap[strcase.ToSnake(col_name)]; ok {
+						if column_obj.Type == proto.ColumnType_STRING && col_value != nil {
+							data[col_name] = strings.ToLower(col_value.(string))
+						}
 					}
 				}
 			}

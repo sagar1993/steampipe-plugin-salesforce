@@ -24,6 +24,7 @@ type salesforceConfig struct {
 	UserDefinedDynamicColumnConfig *string               `cty:"user_defined_dynamic_column_config"`
 	ResultSize                     *int                  `cty:"result_size"`
 	ShowResultSizeError            *bool                 `cty:"show_result_size_error"`
+	CaseSenistiveSearch            *bool                 `cty:"case_sensitive_search"`
 }
 
 type UserDefinedDynamicColumnConfig struct {
@@ -83,6 +84,10 @@ func GetConfig(connection *plugin.Connection) salesforceConfig {
 	config, _ := connection.Config.(salesforceConfig)
 	if config.ShowResultSizeError == nil {
 		config.ShowResultSizeError = &defaultShowResultSize
+	}
+	defaultCaseSenistiveSearch := true
+	if config.ShowResultSizeError == nil {
+		config.CaseSenistiveSearch = &defaultCaseSenistiveSearch
 	}
 	return config
 }
