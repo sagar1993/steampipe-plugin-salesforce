@@ -121,7 +121,7 @@ func (c *CacheUtil) getKeysToPullInBatches(ctx context.Context, tableName string
 						} else {
 							plugin.Logger(ctx).Debug("salesforce.getKeysToPullInBatches column not found in cache", column)
 							columnsFound = false
-							// break
+							break
 						}
 					}
 				}
@@ -212,6 +212,7 @@ func (c *CacheUtil) GetRecordByIdAndBuildCache(ctx context.Context, d *plugin.Qu
 			for column, _ := range columnsMap {
 				if _, exists := recordCache.Get(column); !exists {
 					columnsFound = false
+					break
 				}
 			}
 		}

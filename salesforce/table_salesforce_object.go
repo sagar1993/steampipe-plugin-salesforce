@@ -103,6 +103,7 @@ func listSalesforceObjectsByTable(tableName string, salesforceCols map[string]st
 		}
 
 		var totalRecords int = 0
+		var dataList [][]map[string]interface{}
 		for {
 			plugin.Logger(ctx).Debug("salesforce.listSalesforceObjectsByTable getting results for query : ", query)
 
@@ -119,7 +120,22 @@ func listSalesforceObjectsByTable(tableName string, salesforceCols map[string]st
 				return nil, err
 			}
 
-			for _, account := range *AccountList {
+			totalRecords += len(*AccountList)
+			if *salesforceConfig.ShowResultSizeError && totalRecords > *salesforceConfig.ResultSize {
+				return nil, fmt.Errorf("Query returned too many rows, please add a few filters to reduce it.")
+			}
+
+			dataList = append(dataList, *AccountList)
+
+			// Paging
+			if result.Done {
+				break
+			} else {
+				query = result.NextRecordsURL
+			}
+		}
+		for _, data := range dataList {
+			for _, account := range data {
 				for col_name, col_value := range account {
 					if column_obj, ok := queryColumnsMap[col_name]; ok {
 						if column_obj.Type == proto.ColumnType_STRING && col_value != nil && !strings.HasSuffix(col_name, "id") && !strings.HasSuffix(col_name, "Id") {
@@ -128,21 +144,10 @@ func listSalesforceObjectsByTable(tableName string, salesforceCols map[string]st
 					}
 				}
 				cacheUtil.AddIdsToForeignTableCache(ctx, getTableName(tableName), account)
-				totalRecords += 1
-				if *salesforceConfig.ShowResultSizeError && totalRecords > *salesforceConfig.ResultSize {
-					return nil, fmt.Errorf("Query returned too many rows, please add a few filters to reduce it.")
-				}
 			}
 
-			for _, account := range *AccountList {
+			for _, account := range data {
 				d.StreamListItem(ctx, account)
-			}
-
-			// Paging
-			if result.Done {
-				break
-			} else {
-				query = result.NextRecordsURL
 			}
 		}
 
