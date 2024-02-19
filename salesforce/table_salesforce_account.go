@@ -47,7 +47,7 @@ func SalesforceAccount(ctx context.Context, dm dynamicMap, config salesforceConf
 
 	queryColumnsMap := make(map[string]*plugin.Column)
 	for _, column := range columns {
-		queryColumnsMap[column.Name] = column
+		queryColumnsMap[getSalesforceColumnName(column.Name)] = column
 	}
 
 	return &plugin.Table{

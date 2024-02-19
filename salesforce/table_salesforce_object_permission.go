@@ -29,7 +29,7 @@ func SalesforceObjectPermission(ctx context.Context, dm dynamicMap, config sales
 
 	queryColumnsMap := make(map[string]*plugin.Column)
 	for _, column := range columns {
-		queryColumnsMap[column.Name] = column
+		queryColumnsMap[getSalesforceColumnName(column.Name)] = column
 	}
 
 	return &plugin.Table{

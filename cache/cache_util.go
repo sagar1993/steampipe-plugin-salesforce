@@ -95,7 +95,7 @@ func (c *CacheUtil) getKeyStructForTableName(tableName string) *KeyStruct {
 // TODO create generator function for this
 // so that memory can be freed up
 // discards any entries in cache.
-func (c *CacheUtil) getKeysToPullInBatches(ctx context.Context, tableName string, batchSize int, columns []string) [][]string {
+func (c *CacheUtil) getKeysToPullInBatches(ctx context.Context, tableName string, batchSize int, columnsMap map[string]*plugin.Column) [][]string {
 	startTime := time.Now()
 	defer measureTime(ctx, startTime, "getKeysToPullInBatches")
 
@@ -104,9 +104,7 @@ func (c *CacheUtil) getKeysToPullInBatches(ctx context.Context, tableName string
 	var currentBatch []string
 
 	tableCache := c.getCacheForTableName(tableName)
-
-	var idSet *Set
-	idSet = c.getIdSetForTableName(tableName)
+	idSet := c.getIdSetForTableName(tableName)
 
 	for key, time := range *idSet {
 		if tableCache != nil {
@@ -115,22 +113,30 @@ func (c *CacheUtil) getKeysToPullInBatches(ctx context.Context, tableName string
 				tableCache.Set(key, record, c.cacheExpiration)
 				columnsFound := true
 				if recordCache, ok := record.(*cache.Cache); ok {
-					for _, column := range columns {
+					plugin.Logger(ctx).Debug("salesforce.getKeysToPullInBatches record exists in cache", recordCache.Items())
+					for column, _ := range columnsMap {
 						if value, exists := recordCache.Get(column); exists {
 							// if the required column is present in the record, increment TTL for the element in cache
 							recordCache.Set(column, value, c.cacheExpiration)
 						} else {
+							plugin.Logger(ctx).Debug("salesforce.getKeysToPullInBatches column not found in cache", column)
 							columnsFound = false
-							break
+							// break
 						}
 					}
 				}
 				if columnsFound {
+
+					plugin.Logger(ctx).Debug("salesforce.getKeysToPullInBatches all columns are present in cache ", columnsMap)
 					// if all the required columns are present in the record,
 					// then we don't need to pull the record
 					continue
 				}
+			} else {
+				plugin.Logger(ctx).Debug("salesforce.getKeysToPullInBatches record does not exist in cache", key)
 			}
+		} else {
+			plugin.Logger(ctx).Debug("salesforce.getKeysToPullInBatches table cache in nil", tableName)
 		}
 
 		currentBatch = append(currentBatch, c.IdFormatter(key))
@@ -184,30 +190,43 @@ func (c *CacheUtil) AddIdsToForeignTableCache(ctx context.Context, tableName str
 	}
 
 	// add record to the table cache
-	// id, exists := record[keyStruct.Pk]
-	// if exists {
-	// 	if idValue, ok := id.(string); ok {
-	// 		c.AddRecordToTableCache(ctx, tableName, idValue, record)
-	// 	}
-	// }
+	id, exists := record[keyStruct.Pk]
+	if exists {
+		if idValue, ok := id.(string); ok {
+			c.AddRecordToTableCache(ctx, tableName, idValue, record)
+		}
+	}
 }
 
 // The function is used along with the Get call in plugin, it returns the record from the cache if it exists
 // otherwise it pulls the records from the data source and adds it to the cache
-func (c *CacheUtil) GetRecordByIdAndBuildCache(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData, tableName string, idToReturn string, queryColumnsMap map[string]*plugin.Column) (interface{}, error) {
+func (c *CacheUtil) GetRecordByIdAndBuildCache(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData, tableName string, idToReturn string, columnsMap map[string]*plugin.Column) (interface{}, error) {
 	var tableCache = c.getCacheForTableName(tableName)
 	var keyStruct = c.getKeyStructForTableName(tableName)
 
 	//--------------- Getting values from the cache ------------------//
 
 	if record, exists := tableCache.Get(idToReturn); exists {
-		return GetResultMapFromCache(record.(*cache.Cache))
+		columnsFound := true
+		if recordCache, ok := record.(*cache.Cache); ok {
+			for column, _ := range columnsMap {
+				if _, exists := recordCache.Get(column); !exists {
+					columnsFound = false
+				}
+			}
+		}
+		if columnsFound {
+			plugin.Logger(ctx).Debug("salesforce.GetRecordByIdAndBuildCache columns found in cache returning ")
+			return GetResultMapFromCache(record.(*cache.Cache))
+		}
+		plugin.Logger(ctx).Debug("salesforce.GetRecordByIdAndBuildCache columns not found in cache", record)
+		plugin.Logger(ctx).Debug("salesforce.GetRecordByIdAndBuildCache columns not found in  query columns", d.QueryContext.Columns)
 	} else {
 		plugin.Logger(ctx).Debug("salesforce.GetRecordByIdAndBuildCache ID not present in cache 1st check ", idToReturn)
 	}
 
 	//--------------- Build cache in batches ------------------//
-	var batches = c.getKeysToPullInBatches(ctx, tableName, c.batchSize, d.QueryContext.Columns)
+	var batches = c.getKeysToPullInBatches(ctx, tableName, c.batchSize, columnsMap)
 
 	var wg sync.WaitGroup
 
@@ -216,7 +235,7 @@ func (c *CacheUtil) GetRecordByIdAndBuildCache(ctx context.Context, d *plugin.Qu
 		wg.Add(1)
 
 		go func() {
-			DataList, err := keyStruct.BulkDataPullByIds(ctx, d, h, batch, queryColumnsMap)
+			DataList, err := keyStruct.BulkDataPullByIds(ctx, d, h, batch, columnsMap)
 			if err != nil {
 				plugin.Logger(ctx).Debug("salesforce.GetRecordByIdAndBuildCache", "results decoding error", err)
 			}

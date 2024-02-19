@@ -58,9 +58,11 @@ func SalesforceContact(ctx context.Context, dm dynamicMap, config salesforceConf
 		{Name: "mailing_address", Type: proto.ColumnType_JSON, Description: "The Mailing Address."},
 	})
 
+	plugin.Logger(ctx).Debug("SalesforceContact init")
+
 	queryColumnsMap := make(map[string]*plugin.Column)
 	for _, column := range columns {
-		queryColumnsMap[column.Name] = column
+		queryColumnsMap[getSalesforceColumnName(column.Name)] = column
 	}
 
 	return &plugin.Table{

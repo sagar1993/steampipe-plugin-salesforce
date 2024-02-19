@@ -36,11 +36,11 @@ func SalesforceLead(ctx context.Context, dm dynamicMap, config salesforceConfig)
 		{Name: "website", Type: proto.ColumnType_STRING, Description: "URL of the lead's company's website."},
 	})
 
-	plugin.Logger(ctx).Debug("SalesforceContract init")
+	plugin.Logger(ctx).Debug("SalesforceLead init")
 
 	queryColumnsMap := make(map[string]*plugin.Column)
 	for _, column := range columns {
-		queryColumnsMap[column.Name] = column
+		queryColumnsMap[getSalesforceColumnName(column.Name)] = column
 	}
 
 	return &plugin.Table{

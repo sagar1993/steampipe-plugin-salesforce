@@ -47,9 +47,11 @@ func SalesforceAsset(ctx context.Context, dm dynamicMap, config salesforceConfig
 		{Name: "usage_end_date", Type: proto.ColumnType_TIMESTAMP, Description: "Date when usage for this asset ends or expires."},
 	})
 
+	plugin.Logger(ctx).Debug("SalesforceAsset init")
+
 	queryColumnsMap := make(map[string]*plugin.Column)
 	for _, column := range columns {
-		queryColumnsMap[column.Name] = column
+		queryColumnsMap[getSalesforceColumnName(column.Name)] = column
 	}
 
 	return &plugin.Table{

@@ -25,9 +25,11 @@ func SalesforceAccountContactRole(ctx context.Context, dm dynamicMap, config sal
 		{Name: "last_modified_date", Type: proto.ColumnType_TIMESTAMP, Description: "Date of most recent change in the contact role record."},
 	})
 
+	plugin.Logger(ctx).Debug("AccountContactRole init")
+
 	queryColumnsMap := make(map[string]*plugin.Column)
 	for _, column := range columns {
-		queryColumnsMap[column.Name] = column
+		queryColumnsMap[getSalesforceColumnName(column.Name)] = column
 	}
 
 	return &plugin.Table{

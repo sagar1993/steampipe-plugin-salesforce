@@ -291,7 +291,7 @@ func generateDynamicTables(ctx context.Context, client *simpleforce.Client, conf
 
 	queryColumnsMap := make(map[string]*plugin.Column)
 	for _, column := range cols {
-		queryColumnsMap[column.Name] = column
+		queryColumnsMap[getSalesforceColumnName(column.Name)] = column
 	}
 
 	Table := plugin.Table{
