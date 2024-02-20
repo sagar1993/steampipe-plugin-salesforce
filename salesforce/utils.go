@@ -159,12 +159,11 @@ func buildQueryFromQuals(equalQuals plugin.KeyColumnQualMap, tableColumns []*plu
 								}
 							}
 						} else {
-							symbol := "%"
 							switch qual.Operator {
 							case "=":
-								filters = append(filters, fmt.Sprintf("%s LIKE '%s%s%s'", getSalesforceColumnName(filterQualItem.Name), symbol, value.GetStringValue(), symbol))
+								filters = append(filters, fmt.Sprintf("%s = '%s'", getSalesforceColumnName(filterQualItem.Name), value.GetStringValue()))
 							case "<>":
-								filters = append(filters, fmt.Sprintf("NOT %s LIKE '%s%s%s'", getSalesforceColumnName(filterQualItem.Name), symbol, value.GetStringValue(), symbol))
+								filters = append(filters, fmt.Sprintf("%s != '%s'", getSalesforceColumnName(filterQualItem.Name), value.GetStringValue()))
 							}
 						}
 					case proto.ColumnType_BOOL:
