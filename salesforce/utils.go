@@ -190,18 +190,23 @@ func buildQueryFromQuals(equalQuals plugin.KeyColumnQualMap, tableColumns []*plu
 						}
 					// Need a way to distinguish b/w date and dateTime fields
 					case proto.ColumnType_TIMESTAMP:
-						// https://developer.salesforce.com/docs/atlas.en-us.234.0.soql_sosl.meta/soql_sosl/sforce_api_calls_soql_select_dateformats.htm
-						if salesforceCols[filterQual.Name] == "date" {
-							switch qual.Operator {
-							case "=", ">=", ">", "<=", "<":
-								filters = append(filters, fmt.Sprintf("%s %s %s", getSalesforceColumnName(filterQualItem.Name), qual.Operator, value.GetTimestampValue().AsTime().Format("2006-01-02")))
-							}
-						} else {
-							switch qual.Operator {
-							case "=", ">=", ">", "<=", "<":
-								filters = append(filters, fmt.Sprintf("%s %s %s", getSalesforceColumnName(filterQualItem.Name), qual.Operator, value.GetTimestampValue().AsTime().Format("2006-01-02T15:04:05Z")))
-							}
-						}
+						// commented as timestamp format is not required.
+						filters = append(filters, fmt.Sprintf("%s %s %s", getSalesforceColumnName(filterQualItem.Name), qual.Operator, value.GetTimestampValue().AsTime().Format("2006-01-02")))
+						// plugin.Logger(ctx).Debug("### salesforce.listSalesforceObjectsByTable", "salesforceCols", salesforceCols[filterQual.Name], filterQual.Name)
+						// // https://developer.salesforce.com/docs/atlas.en-us.234.0.soql_sosl.meta/soql_sosl/sforce_api_calls_soql_select_dateformats.htm
+						// if salesforceCols[filterQual.Name] == "date" {
+						// 	switch qual.Operator {
+						// 	case "=", ">=", ">", "<=", "<":
+						// 		plugin.Logger(ctx).Debug("### salesforce.listSalesforceObjectsByTable", "condition one")
+						// 		filters = append(filters, fmt.Sprintf("%s %s %s", getSalesforceColumnName(filterQualItem.Name), qual.Operator, value.GetTimestampValue().AsTime().Format("2006-01-02")))
+						// 	}
+						// } else {
+						// 	switch qual.Operator {
+						// 	case "=", ">=", ">", "<=", "<":
+						// 		plugin.Logger(ctx).Debug("### salesforce.listSalesforceObjectsByTable", "condition two")
+						// 		filters = append(filters, fmt.Sprintf("%s %s %s", getSalesforceColumnName(filterQualItem.Name), qual.Operator, value.GetTimestampValue().AsTime().Format("2006-01-02T15:04:05Z")))
+						// 	}
+						// }
 					}
 				}
 			}
