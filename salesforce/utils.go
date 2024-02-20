@@ -12,6 +12,8 @@ import (
 	"github.com/turbot/steampipe-plugin-sdk/v5/grpc/proto"
 	"github.com/turbot/steampipe-plugin-sdk/v5/plugin"
 	"github.com/turbot/steampipe-plugin-sdk/v5/plugin/transform"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 func connect(ctx context.Context, d *plugin.QueryData) (*simpleforce.Client, error) {
@@ -219,11 +221,29 @@ func getSalesforceColumnName(name string) string {
 	// Salesforce custom fields are suffixed with '__c' and are not converted to
 	// snake case in the table schema, so use the column name as is
 	if strings.HasSuffix(name, "__c") {
-		columnName = name
+		columnName = getSalesforceDynamicColumnName(name)
 	} else {
 		columnName = strcase.ToCamel(name)
 	}
 	return columnName
+}
+
+func getSalesforceDynamicColumnName(name string) string {
+	// Step 1: Remove the suffix "__c"
+	name = strings.TrimSuffix(name, "__c")
+	// Step 2: Split the string by underscores
+	parts := strings.Split(name, "_")
+	// Step 3: Capitalize each part
+	title := cases.Title(language.English)
+	for i, part := range parts {
+		parts[i] = title.String(part)
+	}
+	// Step 4: Join the capitalized parts with underscores
+	convertedFieldName := strings.Join(parts, "_")
+	// Step 5: Add back the suffix "__c"
+	convertedFieldName += "__c"
+
+	return convertedFieldName
 }
 
 func mergeTableColumns(_ context.Context, config salesforceConfig, dynamicColumns []*plugin.Column, staticColumns []*plugin.Column) []*plugin.Column {
