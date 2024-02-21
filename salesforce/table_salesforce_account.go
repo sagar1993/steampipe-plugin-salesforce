@@ -41,6 +41,9 @@ func SalesforceAccount(ctx context.Context, dm dynamicMap, config salesforceConf
 		// JSON columns
 		{Name: "billing_address", Type: proto.ColumnType_JSON, Description: "The billing adress of the account."},
 		{Name: "shipping_address", Type: proto.ColumnType_JSON, Description: "The shipping adress of the account."},
+
+		// Dynamic column to be removed later
+		{Name: "partner_engaged__c", Type: proto.ColumnType_BOOL, Description: "Partner Engaged."},
 	})
 
 	plugin.Logger(ctx).Debug("SalesforceAccount init")
