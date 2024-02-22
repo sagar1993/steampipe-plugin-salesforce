@@ -5,6 +5,7 @@ import (
 
 	"github.com/turbot/steampipe-plugin-sdk/v5/grpc/proto"
 	"github.com/turbot/steampipe-plugin-sdk/v5/plugin"
+	"github.com/turbot/steampipe-plugin-sdk/v5/plugin/transform"
 )
 
 func SalesforceAccount(ctx context.Context, dm dynamicMap, config salesforceConfig) *plugin.Table {
@@ -43,7 +44,7 @@ func SalesforceAccount(ctx context.Context, dm dynamicMap, config salesforceConf
 		{Name: "shipping_address", Type: proto.ColumnType_JSON, Description: "The shipping adress of the account."},
 
 		// Dynamic column to be removed later
-		// {Name: "partner_engaged__c", Type: proto.ColumnType_BOOL, Description: "Partner Engaged."},
+		{Name: "partner_engaged__c", Type: proto.ColumnType_BOOL, Description: "Partner Engaged.", Transform: transform.FromP(getFieldFromSObjectMap, "Partner_Engaged__c")},
 	})
 
 	plugin.Logger(ctx).Debug("SalesforceAccount init")

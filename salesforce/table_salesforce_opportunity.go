@@ -5,6 +5,7 @@ import (
 
 	"github.com/turbot/steampipe-plugin-sdk/v5/grpc/proto"
 	"github.com/turbot/steampipe-plugin-sdk/v5/plugin"
+	"github.com/turbot/steampipe-plugin-sdk/v5/plugin/transform"
 )
 
 func SalesforceOpportunity(ctx context.Context, dm dynamicMap, config salesforceConfig) *plugin.Table {
@@ -49,24 +50,24 @@ func SalesforceOpportunity(ctx context.Context, dm dynamicMap, config salesforce
 		{Name: "type", Type: proto.ColumnType_STRING, Description: "Type of opportunity, such as Existing Business or New Business."},
 
 		// Dynamic column to be removed later
-		// {Name: "acv__c", Type: proto.ColumnType_DOUBLE, Description: "TBD ACV."},
-		// {Name: "closed_reason__c", Type: proto.ColumnType_STRING, Description: "Opportunity Disqualified Reason."},
-		// {Name: "opportunity_category__c", Type: proto.ColumnType_STRING, Description: "Opportunity Category."},
-		// {Name: "opportunity_m1_date_first__c", Type: proto.ColumnType_TIMESTAMP, Description: "Opportunity M1 Date First."},
-		// {Name: "opportunity_new_customer_software_acv__c", Type: proto.ColumnType_DOUBLE, Description: "Opportunity New Customer Software ACV."},
-		// {Name: "opportunity_new_expand_acv__c", Type: proto.ColumnType_DOUBLE, Description: "Opportunity New/Expand Software ACV."},
-		// {Name: "opportunity_owner_id__c", Type: proto.ColumnType_STRING, Description: "Opportunity Owner ID."},
-		// {Name: "opportunity_partner_account__c", Type: proto.ColumnType_STRING, Description: "Opportunity Partner Account."},
-		// {Name: "opportunity_region__c", Type: proto.ColumnType_STRING, Description: "Opportunity Region."},
-		// {Name: "opportunity_source_l__c", Type: proto.ColumnType_STRING, Description: "Opportunity Source Detailed."},
-		// {Name: "opportunity_source_l_manual__c", Type: proto.ColumnType_STRING, Description: "Opportunity Source Detailed Manual."},
-		// {Name: "opportunity_stage_etl__c", Type: proto.ColumnType_STRING, Description: "Opportunity Stage ETL."},
-		// {Name: "opportunity_stage_status__c", Type: proto.ColumnType_STRING, Description: "Opportunity Stage Status."},
-		// {Name: "opportunity_status__c", Type: proto.ColumnType_STRING, Description: "Opportunity Status."},
-		// {Name: "product_amount__c", Type: proto.ColumnType_DOUBLE, Description: "Opportunity Product TCV."},
-		// {Name: "rd_forecast_category__c", Type: proto.ColumnType_STRING, Description: "RD Forecast Category."},
-		// {Name: "tcv__c", Type: proto.ColumnType_DOUBLE, Description: "TCV."},
-		// {Name: "tvp_forecast_category__c", Type: proto.ColumnType_STRING, Description: "TVP Forecast Category."},
+		{Name: "acv__c", Type: proto.ColumnType_DOUBLE, Description: "TBD ACV.", Transform: transform.FromP(getFieldFromSObjectMap, "ACV__c")},
+		{Name: "closed_reason__c", Type: proto.ColumnType_STRING, Description: "Opportunity Disqualified Reason.", Transform: transform.FromP(getFieldFromSObjectMap, "Closed_Reason__c")},
+		{Name: "opportunity_category__c", Type: proto.ColumnType_STRING, Description: "Opportunity Category.", Transform: transform.FromP(getFieldFromSObjectMap, "Opportunity_Category__c")},
+		{Name: "opportunity_m1_date_first__c", Type: proto.ColumnType_TIMESTAMP, Description: "Opportunity M1 Date First.", Transform: transform.FromP(getFieldFromSObjectMap, "Opportunity_M1_Date_First__c")},
+		{Name: "opportunity_new_customer_software_acv__c", Type: proto.ColumnType_DOUBLE, Description: "Opportunity New Customer Software ACV.", Transform: transform.FromP(getFieldFromSObjectMap, "Opportunity_New_Customer_Software_ACV__c")},
+		{Name: "opportunity_new_expand_acv__c", Type: proto.ColumnType_DOUBLE, Description: "Opportunity New/Expand Software ACV.", Transform: transform.FromP(getFieldFromSObjectMap, "Opportunity_New_Expand_ACV__c")},
+		{Name: "opportunity_owner_id__c", Type: proto.ColumnType_STRING, Description: "Opportunity Owner ID.", Transform: transform.FromP(getFieldFromSObjectMap, "Opportunity_Owner_ID__c")},
+		{Name: "opportunity_partner_account__c", Type: proto.ColumnType_STRING, Description: "Opportunity Partner Account.", Transform: transform.FromP(getFieldFromSObjectMap, "Opportunity_Partner_Account__c")},
+		{Name: "opportunity_region__c", Type: proto.ColumnType_STRING, Description: "Opportunity Region.", Transform: transform.FromP(getFieldFromSObjectMap, "Opportunity_Region__c")},
+		{Name: "opportunity_source_l__c", Type: proto.ColumnType_STRING, Description: "Opportunity Source Detailed.", Transform: transform.FromP(getFieldFromSObjectMap, "Opportunity_Source_L__c")},
+		{Name: "opportunity_source_l_manual__c", Type: proto.ColumnType_STRING, Description: "Opportunity Source Detailed Manual.", Transform: transform.FromP(getFieldFromSObjectMap, "Opportunity_Source_L_Manual__c")},
+		{Name: "opportunity_stage_etl__c", Type: proto.ColumnType_STRING, Description: "Opportunity Stage ETL.", Transform: transform.FromP(getFieldFromSObjectMap, "Opportunity_Stage_ETL__c")},
+		{Name: "opportunity_stage_status__c", Type: proto.ColumnType_STRING, Description: "Opportunity Stage Status.", Transform: transform.FromP(getFieldFromSObjectMap, "Opportunity_Stage_Status__c")},
+		{Name: "opportunity_status__c", Type: proto.ColumnType_STRING, Description: "Opportunity Status.", Transform: transform.FromP(getFieldFromSObjectMap, "Opportunity_Status__c")},
+		{Name: "product_amount__c", Type: proto.ColumnType_DOUBLE, Description: "Opportunity Product TCV.", Transform: transform.FromP(getFieldFromSObjectMap, "Product_Amount__c")},
+		{Name: "rd_forecast_category__c", Type: proto.ColumnType_STRING, Description: "RD Forecast Category.", Transform: transform.FromP(getFieldFromSObjectMap, "RD_Forecast_Category__c")},
+		{Name: "tcv__c", Type: proto.ColumnType_DOUBLE, Description: "TCV.", Transform: transform.FromP(getFieldFromSObjectMap, "TCV__c")},
+		{Name: "tvp_forecast_category__c", Type: proto.ColumnType_STRING, Description: "TVP Forecast Category.", Transform: transform.FromP(getFieldFromSObjectMap, "TVP_Forecast_Category__c")},
 	})
 
 	plugin.Logger(ctx).Debug("SalesforceOpportunity init")
