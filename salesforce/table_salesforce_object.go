@@ -94,12 +94,16 @@ func listSalesforceObjectsByTable(tableName string, salesforceCols map[string]st
 			query = fmt.Sprintf("%s  order by lastModifiedDate desc", query)
 		}
 
+		configLimit := math.MaxInt32
 		if salesforceConfig.ResultSize != nil {
-			intValue := *salesforceConfig.ResultSize + 1
-			if 0 < intValue && intValue < math.MaxInt32 {
-				limitString := strconv.Itoa(intValue)
-				query = fmt.Sprintf("%s  limit %s", query, limitString)
-			}
+			configLimit = *salesforceConfig.ResultSize + 1
+		}
+		if d.QueryContext.Limit != nil && int(*d.QueryContext.Limit) < configLimit {
+			configLimit = int(*d.QueryContext.Limit)
+		}
+		if 0 < configLimit && configLimit < math.MaxInt32 {
+			limitString := strconv.Itoa(configLimit)
+			query = fmt.Sprintf("%s  limit %s", query, limitString)
 		}
 
 		var totalRecords int = 0
