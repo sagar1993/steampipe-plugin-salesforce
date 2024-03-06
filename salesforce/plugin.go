@@ -116,6 +116,7 @@ func pluginTableDefinitions(ctx context.Context, td *plugin.TableMapData) (map[s
 			"Pricebook2":              SalesforcePricebook(ctx, dynamicColumnsMap["Pricebook2"], config),
 			"Product2":                SalesforceProduct(ctx, dynamicColumnsMap["Product2"], config),
 			"User":                    SalesforceUser(ctx, dynamicColumnsMap["User"], config),
+			"Case":                    SalesforceCase(ctx, dynamicColumnsMap["Case"], config),
 		}
 	} else {
 		tables = map[string]*plugin.Table{
@@ -134,6 +135,7 @@ func pluginTableDefinitions(ctx context.Context, td *plugin.TableMapData) (map[s
 			"salesforce_pricebook":                 SalesforcePricebook(ctx, dynamicColumnsMap["Pricebook2"], config),
 			"salesforce_product":                   SalesforceProduct(ctx, dynamicColumnsMap["Product2"], config),
 			"salesforce_user":                      SalesforceUser(ctx, dynamicColumnsMap["User"], config),
+			"salesforce_case":                      SalesforceCase(ctx, dynamicColumnsMap["Case"], config),
 		}
 	}
 
