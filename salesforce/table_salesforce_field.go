@@ -10,8 +10,6 @@ import (
 )
 
 func SalesforceField(ctx context.Context, dc map[string]dynamicMap, config salesforceConfig) *plugin.Table {
-	// tableName := "Field"
-
 	plugin.Logger(ctx).Debug("Field init")
 
 	return &plugin.Table{
