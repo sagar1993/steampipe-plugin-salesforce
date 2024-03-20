@@ -20,6 +20,7 @@ func SalesforceField(ctx context.Context, dc map[string]dynamicMap, config sales
 			KeyColumns: plugin.KeyColumnSlice{
 				{Name: "name", Require: plugin.Optional, Operators: []string{"=", "<>"}},
 				{Name: "type", Require: plugin.Optional, Operators: []string{"=", "<>"}},
+				{Name: "table_name", Require: plugin.Optional, Operators: []string{"=", "<>"}},
 			},
 		},
 		Columns: []*plugin.Column{
@@ -35,18 +36,25 @@ func SalesforceField(ctx context.Context, dc map[string]dynamicMap, config sales
 				Type:        proto.ColumnType_STRING,
 				Transform:   transform.FromField("type"),
 			},
+			{
+				Name:        "table_name",
+				Description: "Table which the Salesforce custom field belongs to.",
+				Type:        proto.ColumnType_STRING,
+				Transform:   transform.FromField("table_name"),
+			},
 		},
 	}
 }
 
 func listFields(dc map[string]dynamicMap) func(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData) (interface{}, error) {
 	return func(ctx context.Context, d *plugin.QueryData, h *plugin.HydrateData) (interface{}, error) {
-		for _, m := range dc {
+		for tableName, m := range dc {
 			for colName, colType := range m.salesforceColumns {
 				if strings.HasSuffix(colName, "__c") {
 					row := map[string]interface{}{
-						"name": colName,
-						"type": colType,
+						"name":       colName,
+						"type":       colType,
+						"table_name": tableName,
 					}
 					d.StreamListItem(ctx, row)
 
