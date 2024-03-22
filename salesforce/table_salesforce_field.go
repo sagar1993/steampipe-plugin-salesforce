@@ -21,6 +21,7 @@ func SalesforceField(ctx context.Context, dc map[string]dynamicMap, config sales
 				{Name: "name", Require: plugin.Optional, Operators: []string{"=", "<>"}},
 				{Name: "type", Require: plugin.Optional, Operators: []string{"=", "<>"}},
 				{Name: "table_name", Require: plugin.Optional, Operators: []string{"=", "<>"}},
+				{Name: "is_custom", Require: plugin.Optional, Operators: []string{"=", "<>"}},
 			},
 		},
 		Columns: []*plugin.Column{
@@ -42,6 +43,12 @@ func SalesforceField(ctx context.Context, dc map[string]dynamicMap, config sales
 				Type:        proto.ColumnType_STRING,
 				Transform:   transform.FromField("table_name"),
 			},
+			{
+				Name:        "is_custom",
+				Description: "Represents if this Salesforce field is custom created or not.",
+				Type:        proto.ColumnType_BOOL,
+				Transform:   transform.FromField("is_custom"),
+			},
 		},
 	}
 }
@@ -55,6 +62,7 @@ func listFields(dc map[string]dynamicMap) func(ctx context.Context, d *plugin.Qu
 						"name":       colName,
 						"type":       colType,
 						"table_name": tableName,
+						"is_custom":  true,
 					}
 					d.StreamListItem(ctx, row)
 
