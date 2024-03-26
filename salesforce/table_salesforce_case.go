@@ -10,7 +10,7 @@ import (
 func SalesforceCase(ctx context.Context, dm dynamicMap, config salesforceConfig) *plugin.Table {
 	tableName := "Case"
 
-	columns := mergeTableColumns(ctx, config, dm.cols, []*plugin.Column{ //
+	columns := mergeTableColumns(ctx, config, getCustomCols(dm), []*plugin.Column{ //
 		// Top columns
 		{Name: "id", Type: proto.ColumnType_STRING, Description: "Unique identifier of the account in Salesforce."},
 		{Name: "is_deleted", Type: proto.ColumnType_BOOL, Description: ""},

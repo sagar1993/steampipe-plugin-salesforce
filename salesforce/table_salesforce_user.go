@@ -10,7 +10,7 @@ import (
 func SalesforceUser(ctx context.Context, dm dynamicMap, config salesforceConfig) *plugin.Table {
 	tableName := "User"
 
-	columns := mergeTableColumns(ctx, config, dm.cols, []*plugin.Column{
+	columns := mergeTableColumns(ctx, config, getCustomCols(dm), []*plugin.Column{
 		// Top columns
 		{Name: "id", Type: proto.ColumnType_STRING, Description: "Unique identifier of the user in Salesforce."},
 		{Name: "alias", Type: proto.ColumnType_STRING, Description: "The user's alias. For example, jsmith."},

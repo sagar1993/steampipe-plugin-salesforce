@@ -10,7 +10,7 @@ import (
 func SalesforceAccountContactRole(ctx context.Context, dm dynamicMap, config salesforceConfig) *plugin.Table {
 	tableName := "AccountContactRole"
 
-	columns := mergeTableColumns(ctx, config, dm.cols, []*plugin.Column{
+	columns := mergeTableColumns(ctx, config, getCustomCols(dm), []*plugin.Column{
 		// Top columns
 		{Name: "id", Type: proto.ColumnType_STRING, Description: "Unique identifier of the account contact role in Salesforce."},
 		{Name: "account_id", Type: proto.ColumnType_STRING, Description: "ID of the Account."},

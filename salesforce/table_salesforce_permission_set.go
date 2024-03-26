@@ -10,7 +10,7 @@ import (
 func SalesforcePermissionSet(ctx context.Context, dm dynamicMap, config salesforceConfig) *plugin.Table {
 	tableName := "PermissionSet"
 
-	columns := mergeTableColumns(ctx, config, dm.cols, []*plugin.Column{
+	columns := mergeTableColumns(ctx, config, getCustomCols(dm), []*plugin.Column{
 		// Top columns
 		{Name: "id", Type: proto.ColumnType_STRING, Description: "The unique id of the permission set."},
 		{Name: "name", Type: proto.ColumnType_STRING, Description: "The permission set unique name in the API."},

@@ -10,7 +10,7 @@ import (
 func SalesforceOrder(ctx context.Context, dm dynamicMap, config salesforceConfig) *plugin.Table {
 	tableName := "Order"
 
-	columns := mergeTableColumns(ctx, config, dm.cols, []*plugin.Column{
+	columns := mergeTableColumns(ctx, config, getCustomCols(dm), []*plugin.Column{
 		// Top columns
 		{Name: "id", Type: proto.ColumnType_STRING, Description: "Unique identifier of the order in Salesforce."},
 		{Name: "name", Type: proto.ColumnType_STRING, Description: "Title for the order that distinguishes it from other orders."},

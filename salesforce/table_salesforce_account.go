@@ -11,7 +11,7 @@ import (
 func SalesforceAccount(ctx context.Context, dm dynamicMap, config salesforceConfig) *plugin.Table {
 	tableName := "Account"
 
-	columns := mergeTableColumns(ctx, config, dm.cols, []*plugin.Column{
+	columns := mergeTableColumns(ctx, config, getCustomCols(dm), []*plugin.Column{
 		// Top columns
 		{Name: "id", Type: proto.ColumnType_STRING, Description: "Unique identifier of the account in Salesforce."},
 		{Name: "name", Type: proto.ColumnType_STRING, Description: "Name of the account."},

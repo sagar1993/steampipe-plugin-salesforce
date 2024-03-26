@@ -10,7 +10,7 @@ import (
 func SalesforceObjectPermission(ctx context.Context, dm dynamicMap, config salesforceConfig) *plugin.Table {
 	tableName := "ObjectPermissions"
 
-	columns := mergeTableColumns(ctx, config, dm.cols, []*plugin.Column{
+	columns := mergeTableColumns(ctx, config, getCustomCols(dm), []*plugin.Column{
 		// Top columns
 		{Name: "id", Type: proto.ColumnType_STRING, Description: "The ObjectPermissions ID."},
 		{Name: "parent_id", Type: proto.ColumnType_STRING, Description: "The Id of this object's parent PermissionSet."},

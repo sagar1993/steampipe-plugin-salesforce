@@ -10,7 +10,7 @@ import (
 func SalesforcePermissionSetAssignment(ctx context.Context, dm dynamicMap, config salesforceConfig) *plugin.Table {
 	tableName := "PermissionSetAssignment"
 
-	columns := mergeTableColumns(ctx, config, dm.cols, []*plugin.Column{
+	columns := mergeTableColumns(ctx, config, getCustomCols(dm), []*plugin.Column{
 		{Name: "assignee_id", Type: proto.ColumnType_STRING, Description: "ID of the User to assign the permission set specified in PermissionSetId."},
 		{Name: "id", Type: proto.ColumnType_STRING, Description: "The Permission Set Assignment ID."},
 		{Name: "permission_set_group_id", Type: proto.ColumnType_STRING, Description: "If associated with a permission set group, this is the ID of that group."},

@@ -10,7 +10,7 @@ import (
 func SalesforceContact(ctx context.Context, dm dynamicMap, config salesforceConfig) *plugin.Table {
 	tableName := "Contact"
 
-	columns := mergeTableColumns(ctx, config, dm.cols, []*plugin.Column{
+	columns := mergeTableColumns(ctx, config, getCustomCols(dm), []*plugin.Column{
 		// Top columns
 		{Name: "id", Type: proto.ColumnType_STRING, Description: "ID of the account that's the parent of this contact."},
 		{Name: "name", Type: proto.ColumnType_STRING, Description: "The full name of the contact."},

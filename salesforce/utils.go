@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 	"strings"
 
 	"github.com/iancoleman/strcase"
@@ -391,4 +393,37 @@ func getKeyColumns(columns []*plugin.Column) plugin.KeyColumnSlice {
 		}
 	}
 	return keyColumns
+}
+
+func getCustomFieldMap() map[string]map[string]interface{} {
+	result := make(map[string]map[string]interface{})
+	steampipe_home := os.Getenv("STEAMPIPE_HOME")
+	customFieldMapFile := steampipe_home + "/config/salesforce/custom_field.json"
+	jsonFile, err := os.Open(customFieldMapFile)
+
+	if err == nil {
+		defer jsonFile.Close()
+		byteValue, _ := io.ReadAll(jsonFile)
+		var response []map[string]interface{}
+
+		jerr := json.Unmarshal([]byte(byteValue), &response)
+		if jerr == nil {
+			for _, item := range response {
+				result[item["name"].(string)] = item
+			}
+		}
+	}
+
+	return result
+}
+
+func getCustomCols(dm dynamicMap) []*plugin.Column {
+	customCols := []*plugin.Column{}
+	customFieldMap := getCustomFieldMap()
+	for _, col := range dm.cols {
+		if _, ok := customFieldMap[col.Name]; ok {
+			customCols = append(customCols, col)
+		}
+	}
+	return customCols
 }
